@@ -1,6 +1,6 @@
 {
     "name": "rtlsdr-fm-radio",
     "version-string": "0.1.0",
-    "dependencies": [ "fmt", "rtlsdr" ]
+    "dependencies": [ "fmt", "rtlsdr", "portaudio" ]
   }
   

@@ -14,20 +14,30 @@ Status: install ok installed
 
 Package: fmt
 Version: 12.1.0
-Depends: vcpkg-cmake:x64-windows, vcpkg-cmake-config:x64-windows
-Architecture: x86-windows
+Depends: vcpkg-cmake, vcpkg-cmake-config
+Architecture: x64-windows
 Multi-Arch: same
-Abi: 7f5ffe628bf5366bb2067c47865f793afa8da41caa9b3eeeddae229ef0bd7a75
+Abi: 059fa82068806f2dc9e2e44580b181f3c5bf8fdef7ece1061bfea5c4e1f130ac
 Description: {fmt} is an open-source formatting library providing a fast and safe alternative to C stdio and C++ iostreams.
+Status: install ok installed
+
+Package: portaudio
+Version: 19.7
+Port-Version: 8
+Depends: vcpkg-cmake, vcpkg-cmake-config
+Architecture: x64-windows
+Multi-Arch: same
+Abi: b2656f234df00cbb6095e4b25d1cb43b257e356fd59a7786fb39540e44ce7e30
+Description: PortAudio Portable Cross-platform Audio I/O API PortAudio is a free, cross-platform, open-source, audio I/O library.  It lets you write simple audio programs in 'C' or C++ that will compile and run on many platforms including Windows, Macintosh OS X, and Unix (OSS/ALSA). It is intended to promote the exchange of audio software between developers on different platforms. Many applications use PortAudio for Audio I/O.
 Status: install ok installed
 
 Package: pthreads
 Version: 3.0.0
 Port-Version: 14
-Depends: vcpkg-cmake-config:x64-windows
-Architecture: x86-windows
+Depends: vcpkg-cmake-config
+Architecture: x64-windows
 Multi-Arch: same
-Abi: fbac3988de70b1377ed8ef04ed0d481cbf7b0209c9cb439974d861809dc05a7f
+Abi: 55876a8620f28675de86d641ebb438277702c5bb44cf8510d5f4fbae5cf250a6
 Description: Meta-package that provides PThreads4W on Windows, or assumes presence of system pthreads on POSIX systems.
 Status: install ok installed
 
@@ -78,19 +88,19 @@ Status: install ok installed
 Package: libusb
 Version: 1.0.29
 Port-Version: 1
-Depends: vcpkg-msbuild:x64-windows
-Architecture: x86-windows
+Depends: vcpkg-msbuild
+Architecture: x64-windows
 Multi-Arch: same
-Abi: 6f37650b38a1a9c7dfb0d250f25a280fc3107e5b09f16a45c72a92f5fdda87b9
+Abi: ac26b8c9b04f92795a9d101c1882123a04a8f871abac3d06ad8a2173da8c9f2f
 Description: a cross-platform library to access USB devices
 Status: install ok installed
 
 Package: rtlsdr
 Version: 2.0.2
-Depends: libusb, pthreads, vcpkg-cmake:x64-windows, vcpkg-cmake-config:x64-windows
-Architecture: x86-windows
+Depends: libusb, pthreads, vcpkg-cmake, vcpkg-cmake-config
+Architecture: x64-windows
 Multi-Arch: same
-Abi: 5418a04788aa853a1cd9b3d62fc27e85ff58c36b139497a828a0f5c5833baea5
+Abi: 226db0a16b7dfa3f71bbaf7c6500f832448f4b231287658b0273ec602767d009
 Description: rtl-sdr is a library that turns your Realtek RTL2832 based DVB dongle into a SDR receiver
 Status: install ok installed
 

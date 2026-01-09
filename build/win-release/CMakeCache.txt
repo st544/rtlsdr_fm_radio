@@ -15,14 +15,14 @@
 ########################
 
 //Path to a program.
-CMAKE_AR:FILEPATH=C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.28.29910/bin/Hostx86/x86/lib.exe
+CMAKE_AR:FILEPATH=C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.28.29910/bin/Hostx64/x64/lib.exe
 
 //Choose the type of build, options are: None Debug Release RelWithDebInfo
 // MinSizeRel ...
 CMAKE_BUILD_TYPE:STRING=Release
 
 //CXX compiler
-CMAKE_CXX_COMPILER:FILEPATH=C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.28.29910/bin/Hostx86/x86/cl.exe
+CMAKE_CXX_COMPILER:FILEPATH=C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.28.29910/bin/Hostx64/x64/cl.exe
 
 //Flags used by the CXX compiler during all build types.
 CMAKE_CXX_FLAGS:STRING=/DWIN32 /D_WINDOWS /EHsc
@@ -43,7 +43,7 @@ CMAKE_CXX_FLAGS_RELWITHDEBINFO:STRING=/Zi /O2 /Ob1 /DNDEBUG
 CMAKE_CXX_STANDARD_LIBRARIES:STRING=kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib
 
 //Flags used by the linker during all build types.
-CMAKE_EXE_LINKER_FLAGS:STRING=/machine:X86
+CMAKE_EXE_LINKER_FLAGS:STRING=/machine:x64
 
 //Flags used by the linker during DEBUG builds.
 CMAKE_EXE_LINKER_FLAGS_DEBUG:STRING=/debug /INCREMENTAL
@@ -70,14 +70,14 @@ CMAKE_FIND_PACKAGE_REDIRECTS_DIR:STATIC=C:/Users/st544/Documents/GitHub/RTLSDR_F
 CMAKE_INSTALL_PREFIX:PATH=C:/Program Files (x86)/rtlsdr_fm_radio
 
 //Path to a program.
-CMAKE_LINKER:FILEPATH=C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.28.29910/bin/Hostx86/x86/link.exe
+CMAKE_LINKER:FILEPATH=C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.28.29910/bin/Hostx64/x64/link.exe
 
 //Program used to build from build.ninja files.
 CMAKE_MAKE_PROGRAM:FILEPATH=C:/Users/st544/miniconda3/Library/bin/ninja.exe
 
 //Flags used by the linker during the creation of modules during
 // all build types.
-CMAKE_MODULE_LINKER_FLAGS:STRING=/machine:X86
+CMAKE_MODULE_LINKER_FLAGS:STRING=/machine:x64
 
 //Flags used by the linker during the creation of modules during
 // DEBUG builds.
@@ -96,7 +96,7 @@ CMAKE_MODULE_LINKER_FLAGS_RELEASE:STRING=/INCREMENTAL:NO
 CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO:STRING=/debug /INCREMENTAL
 
 //Path to a program.
-CMAKE_MT:FILEPATH=C:/Program Files (x86)/Windows Kits/10/bin/10.0.19041.0/x86/mt.exe
+CMAKE_MT:FILEPATH=C:/Program Files (x86)/Windows Kits/10/bin/10.0.19041.0/x64/mt.exe
 
 //Value Computed by CMake
 CMAKE_PROJECT_COMPAT_VERSION:STATIC=
@@ -114,7 +114,7 @@ CMAKE_PROJECT_NAME:STATIC=rtlsdr_fm_radio
 CMAKE_PROJECT_SPDX_LICENSE:STATIC=
 
 //RC compiler
-CMAKE_RC_COMPILER:FILEPATH=C:/Program Files (x86)/Windows Kits/10/bin/10.0.19041.0/x86/rc.exe
+CMAKE_RC_COMPILER:FILEPATH=C:/Program Files (x86)/Windows Kits/10/bin/10.0.19041.0/x64/rc.exe
 
 //Flags for Windows Resource Compiler during all build types.
 CMAKE_RC_FLAGS:STRING=-DWIN32
@@ -133,7 +133,7 @@ CMAKE_RC_FLAGS_RELWITHDEBINFO:STRING=
 
 //Flags used by the linker during the creation of shared libraries
 // during all build types.
-CMAKE_SHARED_LINKER_FLAGS:STRING=/machine:X86
+CMAKE_SHARED_LINKER_FLAGS:STRING=/machine:x64
 
 //Flags used by the linker during the creation of shared libraries
 // during DEBUG builds.
@@ -160,7 +160,7 @@ CMAKE_SKIP_RPATH:BOOL=NO
 
 //Flags used by the archiver during the creation of static libraries
 // during all build types.
-CMAKE_STATIC_LINKER_FLAGS:STRING=/machine:X86
+CMAKE_STATIC_LINKER_FLAGS:STRING=/machine:x64
 
 //Flags used by the archiver during the creation of static libraries
 // during DEBUG builds.
@@ -178,8 +178,8 @@ CMAKE_STATIC_LINKER_FLAGS_RELEASE:STRING=
 // during RELWITHDEBINFO builds.
 CMAKE_STATIC_LINKER_FLAGS_RELWITHDEBINFO:STRING=
 
-//No help, variable specified on the command line.
-CMAKE_TOOLCHAIN_FILE:UNINITIALIZED=C:/Users/st544/Documents/GitHub/vcpkg/scripts/buildsystems/vcpkg.cmake
+//The CMake toolchain file
+CMAKE_TOOLCHAIN_FILE:FILEPATH=C:/Users/st544/Documents/GitHub/vcpkg/scripts/buildsystems/vcpkg.cmake
 
 //If this value is on, makefiles will be generated without the
 // .SILENT directive, and all commands will be echoed to the console
@@ -188,46 +188,46 @@ CMAKE_TOOLCHAIN_FILE:UNINITIALIZED=C:/Users/st544/Documents/GitHub/vcpkg/scripts
 CMAKE_VERBOSE_MAKEFILE:BOOL=FALSE
 
 //Path to a library.
-PThreads4W_CXXEXC_LIBRARY_DEBUG:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/debug/lib/pthreadVCE3d.lib
+PThreads4W_CXXEXC_LIBRARY_DEBUG:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/debug/lib/pthreadVCE3d.lib
 
 //Path to a file.
-PThreads4W_CXXEXC_LIBRARY_DEBUG_DLL:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/debug/bin/pthreadVCE3d.dll
+PThreads4W_CXXEXC_LIBRARY_DEBUG_DLL:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/debug/bin/pthreadVCE3d.dll
 
 //Path to a library.
-PThreads4W_CXXEXC_LIBRARY_RELEASE:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/lib/pthreadVCE3.lib
+PThreads4W_CXXEXC_LIBRARY_RELEASE:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/lib/pthreadVCE3.lib
 
 //Path to a file.
-PThreads4W_CXXEXC_LIBRARY_RELEASE_DLL:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/bin/pthreadVCE3.dll
+PThreads4W_CXXEXC_LIBRARY_RELEASE_DLL:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/bin/pthreadVCE3.dll
 
 //The directory containing a CMake configuration file for PThreads4W.
-PThreads4W_DIR:PATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/share/PThreads4W
+PThreads4W_DIR:PATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/share/PThreads4W
 
 //Path to a file.
-PThreads4W_INCLUDE_DIR:PATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/include
+PThreads4W_INCLUDE_DIR:PATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/include
 
 //Path to a library.
-PThreads4W_LIBRARY_DEBUG:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/debug/lib/pthreadVC3d.lib
+PThreads4W_LIBRARY_DEBUG:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/debug/lib/pthreadVC3d.lib
 
 //Path to a file.
-PThreads4W_LIBRARY_DEBUG_DLL:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/debug/bin/pthreadVC3d.dll
+PThreads4W_LIBRARY_DEBUG_DLL:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/debug/bin/pthreadVC3d.dll
 
 //Path to a library.
-PThreads4W_LIBRARY_RELEASE:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/lib/pthreadVC3.lib
+PThreads4W_LIBRARY_RELEASE:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/lib/pthreadVC3.lib
 
 //Path to a file.
-PThreads4W_LIBRARY_RELEASE_DLL:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/bin/pthreadVC3.dll
+PThreads4W_LIBRARY_RELEASE_DLL:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/bin/pthreadVC3.dll
 
 //Path to a library.
-PThreads4W_STRUCTEXC_LIBRARY_DEBUG:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/debug/lib/pthreadVSE3d.lib
+PThreads4W_STRUCTEXC_LIBRARY_DEBUG:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/debug/lib/pthreadVSE3d.lib
 
 //Path to a file.
-PThreads4W_STRUCTEXC_LIBRARY_DEBUG_DLL:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/debug/bin/pthreadVSE3d.dll
+PThreads4W_STRUCTEXC_LIBRARY_DEBUG_DLL:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/debug/bin/pthreadVSE3d.dll
 
 //Path to a library.
-PThreads4W_STRUCTEXC_LIBRARY_RELEASE:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/lib/pthreadVSE3.lib
+PThreads4W_STRUCTEXC_LIBRARY_RELEASE:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/lib/pthreadVSE3.lib
 
 //Path to a file.
-PThreads4W_STRUCTEXC_LIBRARY_RELEASE_DLL:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/bin/pthreadVSE3.dll
+PThreads4W_STRUCTEXC_LIBRARY_RELEASE_DLL:FILEPATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/bin/pthreadVSE3.dll
 
 //Automatically copy dependencies into the output directory for
 // executables.
@@ -271,7 +271,7 @@ VCPKG_PREFER_SYSTEM_LIBS:BOOL=OFF
 VCPKG_SETUP_CMAKE_PROGRAM_PATH:BOOL=ON
 
 //Vcpkg target triplet (ex. x86-windows)
-VCPKG_TARGET_TRIPLET:STRING=x86-windows
+VCPKG_TARGET_TRIPLET:STRING=x64-windows
 
 //Trace calls to find_package()
 VCPKG_TRACE_FIND_PACKAGE:BOOL=OFF
@@ -288,9 +288,6 @@ X_VCPKG_APPLOCAL_DEPS_INSTALL:BOOL=OFF
 X_VCPKG_APPLOCAL_DEPS_SERIALIZED:BOOL=OFF
 
 //Path to a program.
-Z_VCPKG_CL:FILEPATH=C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.28.29910/bin/Hostx86/x86/cl.exe
-
-//Path to a program.
 Z_VCPKG_PWSH_PATH:FILEPATH=C:/Program Files/PowerShell/7/pwsh.exe
 
 //The directory which contains the installed libraries for each
@@ -298,10 +295,13 @@ Z_VCPKG_PWSH_PATH:FILEPATH=C:/Program Files/PowerShell/7/pwsh.exe
 _VCPKG_INSTALLED_DIR:PATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed
 
 //The directory containing a CMake configuration file for fmt.
-fmt_DIR:PATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/share/fmt
+fmt_DIR:PATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/share/fmt
+
+//The directory containing a CMake configuration file for portaudio.
+portaudio_DIR:PATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/share/portaudio
 
 //The directory containing a CMake configuration file for rtlsdr.
-rtlsdr_DIR:PATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/share/rtlsdr
+rtlsdr_DIR:PATH=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/share/rtlsdr
 
 //Value Computed by CMake
 rtlsdr_fm_radio_BINARY_DIR:STATIC=C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release
@@ -446,7 +446,7 @@ CMAKE_TOOLCHAIN_FILE-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_VERBOSE_MAKEFILE
 CMAKE_VERBOSE_MAKEFILE-ADVANCED:INTERNAL=1
 //Details about finding PThreads4W
-FIND_PACKAGE_MESSAGE_DETAILS_PThreads4W:INTERNAL=[optimized;C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/lib/pthreadVC3.lib;debug;C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/debug/lib/pthreadVC3d.lib][optimized;C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/lib/pthreadVCE3.lib;debug;C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/debug/lib/pthreadVCE3d.lib][optimized;C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/lib/pthreadVSE3.lib;debug;C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/debug/lib/pthreadVSE3d.lib][C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x86-windows/include][v()]
+FIND_PACKAGE_MESSAGE_DETAILS_PThreads4W:INTERNAL=[optimized;C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/lib/pthreadVC3.lib;debug;C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/debug/lib/pthreadVC3d.lib][optimized;C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/lib/pthreadVCE3.lib;debug;C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/debug/lib/pthreadVCE3d.lib][optimized;C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/lib/pthreadVSE3.lib;debug;C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/debug/lib/pthreadVSE3d.lib][C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/vcpkg_installed/x64-windows/include][v()]
 //ADVANCED property for variable: PThreads4W_CXXEXC_LIBRARY_DEBUG
 PThreads4W_CXXEXC_LIBRARY_DEBUG-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: PThreads4W_CXXEXC_LIBRARY_RELEASE

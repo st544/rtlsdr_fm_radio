@@ -1,19 +1,63 @@
 Detecting compiler hash for triplet x64-windows...
 Compiler found: C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.28.29910/bin/Hostx64/x64/cl.exe
-Detecting compiler hash for triplet x86-windows...
-Compiler found: C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.28.29910/bin/Hostx64/x86/cl.exe
-The following packages are already installed:
-    fmt:x86-windows@12.1.0
-  * libusb:x86-windows@1.0.29#1
+The following packages will be built and installed:
+    fmt:x64-windows@12.1.0
+  * libusb:x64-windows@1.0.29#1
   * pkgconf:x64-windows@2.5.1#4
-  * pthreads:x86-windows@3.0.0#14
-    rtlsdr:x86-windows@2.0.2
+    portaudio:x64-windows@19.7#8
+  * pthreads:x64-windows@3.0.0#14
+    rtlsdr:x64-windows@2.0.2
   * vcpkg-cmake:x64-windows@2024-04-23
   * vcpkg-cmake-config:x64-windows@2024-05-23
   * vcpkg-cmake-get-vars:x64-windows@2025-05-29
   * vcpkg-msbuild:x64-windows@2023-08-08
   * vcpkg-pkgconfig-get-modules:x64-windows@2024-04-03
   * vcpkg-tool-meson:x64-windows@1.9.0#3
+Additional packages (*) will be modified to complete this operation.
+Restored 12 package(s) from C:\Users\st544\AppData\Local\vcpkg\archives in 1.8 s. Use --debug to see more details.
+Installing 1/12 vcpkg-cmake-config:x64-windows@2024-05-23...
+Elapsed time to handle vcpkg-cmake-config:x64-windows: 5.64 ms
+vcpkg-cmake-config:x64-windows package ABI: 39aeedddf68cc0f7023ad96bfdb8f0d3671ae8a2d63b64afa15944835e17fa06
+Installing 2/12 vcpkg-cmake:x64-windows@2024-04-23...
+Elapsed time to handle vcpkg-cmake:x64-windows: 6.5 ms
+vcpkg-cmake:x64-windows package ABI: 7b2103def648caa5075009a55f3822333eb910397ee8e9caded64a7ff0dc644e
+Installing 3/12 fmt:x64-windows@12.1.0...
+Elapsed time to handle fmt:x64-windows: 16 ms
+fmt:x64-windows package ABI: 059fa82068806f2dc9e2e44580b181f3c5bf8fdef7ece1061bfea5c4e1f130ac
+Installing 4/12 portaudio:x64-windows@19.7#8...
+Elapsed time to handle portaudio:x64-windows: 12.9 ms
+portaudio:x64-windows package ABI: b2656f234df00cbb6095e4b25d1cb43b257e356fd59a7786fb39540e44ce7e30
+Installing 5/12 pthreads:x64-windows@3.0.0#14...
+Elapsed time to handle pthreads:x64-windows: 14.2 ms
+pthreads:x64-windows package ABI: 55876a8620f28675de86d641ebb438277702c5bb44cf8510d5f4fbae5cf250a6
+Installing 6/12 vcpkg-cmake-get-vars:x64-windows@2025-05-29...
+Elapsed time to handle vcpkg-cmake-get-vars:x64-windows: 7.2 ms
+vcpkg-cmake-get-vars:x64-windows package ABI: 56606fb4796f850c86a5e721c04914dfe6003f154798a9f58bcdca63c23896d2
+Installing 7/12 vcpkg-tool-meson:x64-windows@1.9.0#3...
+Elapsed time to handle vcpkg-tool-meson:x64-windows: 8.6 ms
+vcpkg-tool-meson:x64-windows package ABI: 38b370e324d8ef1b1a44d7ec125024e94842a8b0f7f1a305bdef90da43f9bdf2
+Installing 8/12 pkgconf:x64-windows@2.5.1#4...
+Elapsed time to handle pkgconf:x64-windows: 13.4 ms
+pkgconf:x64-windows package ABI: c88e4801c93de99b9a52173010f52faec8207eff7b31f1a13ddbd475a81761da
+Installing 9/12 vcpkg-pkgconfig-get-modules:x64-windows@2024-04-03...
+Elapsed time to handle vcpkg-pkgconfig-get-modules:x64-windows: 6.1 ms
+vcpkg-pkgconfig-get-modules:x64-windows package ABI: c7dc51d4dc79e3640fbf3524010e2bc595ad0d559b7530f9ac5aff713bc035ee
+Installing 10/12 vcpkg-msbuild:x64-windows@2023-08-08...
+Elapsed time to handle vcpkg-msbuild:x64-windows: 7.15 ms
+vcpkg-msbuild:x64-windows package ABI: 91f6306b6e3599394e83a185e38835c1a3ade21b2767fdd9504a880319c99a4f
+Installing 11/12 libusb:x64-windows@1.0.29#1...
+Elapsed time to handle libusb:x64-windows: 9.95 ms
+libusb:x64-windows package ABI: ac26b8c9b04f92795a9d101c1882123a04a8f871abac3d06ad8a2173da8c9f2f
+Installing 12/12 rtlsdr:x64-windows@2.0.2...
+Elapsed time to handle rtlsdr:x64-windows: 11.9 ms
+rtlsdr:x64-windows package ABI: 226db0a16b7dfa3f71bbaf7c6500f832448f4b231287658b0273ec602767d009
+Installed contents are licensed to you by owners. Microsoft is not responsible for, nor does it grant any licenses to, third-party packages.
+Some packages did not declare an SPDX license. Check the `copyright` file for each package for more information about their licensing.
+Packages installed in this vcpkg installation declare the following licenses:
+Apache-2.0
+GPL-2.0-or-later
+LGPL-2.1-or-later
+MIT
 The package fmt provides CMake targets:
 
     find_package(fmt CONFIG REQUIRED)
@@ -22,6 +66,17 @@ The package fmt provides CMake targets:
     # Or use the header-only version
     find_package(fmt CONFIG REQUIRED)
     target_link_libraries(main PRIVATE fmt::fmt-header-only)
+
+portaudio provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(portaudio CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE portaudio)
+
+portaudio provides pkg-config modules:
+
+  # Portable audio I/O
+  portaudio-2.0
 
 rtlsdr provides CMake targets:
 
@@ -33,4 +88,4 @@ rtlsdr provides pkg-config modules:
   # C Utility Library
   librtlsdr
 
-All requested installations completed successfully in: 1.19 ms
+All requested installations completed successfully in: 127 ms

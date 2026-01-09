@@ -6,5 +6,6 @@ set_target_properties(FM_Radio PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED 
 
 find_package(fmt CONFIG REQUIRED)
 find_package(rtlsdr CONFIG REQUIRED)
+find_package(portaudio CONFIG REQUIRED)
 
-target_link_libraries(FM_Radio PRIVATE rtlsdr::rtlsdr)
+target_link_libraries(FM_Radio PRIVATE rtlsdr::rtlsdr portaudio)
