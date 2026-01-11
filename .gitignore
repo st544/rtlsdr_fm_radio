@@ -1,2 +1,10 @@
 build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+*.cmake
+*.ninja
+*.ninja_deps
+*.ninja_log
+compile_commands.json
 .vscode/

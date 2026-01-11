@@ -1,3 +1,0 @@
-C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/CMakeFiles/FM_Radio.dir
-C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/CMakeFiles/edit_cache.dir
-C:/Users/st544/Documents/GitHub/RTLSDR_FM_Radio/build/win-release/CMakeFiles/rebuild_cache.dir
