@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Optional but helpful: use Ninja explicitly
+      - name: Install Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      # vcpkg caching (x-gha) - speeds up installs dramatically
+      - name: Configure vcpkg binary cache
+        shell: pwsh
+        run: |
+          echo "VCPKG_BINARY_SOURCES=clear;x-gha,readwrite" >> $env:GITHUB_ENV
+
+      # Configure + build using CMakePresets.json
+      # Your preset must point to vcpkg toolchain and set VCPKG_TARGET_TRIPLET=x64-windows
+      - name: Configure
+        shell: pwsh
+        run: cmake --preset win-release
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build --preset win-release
+
+      # If you add tests later (ctest), keep this:
+      - name: Test
+        shell: pwsh
+        run: ctest --preset win-release --output-on-failure
+        continue-on-error: true
