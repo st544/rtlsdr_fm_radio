@@ -7,7 +7,7 @@
         "binaryDir": "${sourceDir}/build/win-debug",
         "cacheVariables": {
           "CMAKE_BUILD_TYPE": "Debug",
-          "CMAKE_TOOLCHAIN_FILE": "C:/Users/st544/Documents/GitHub/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
         }
       },
       {
@@ -16,7 +16,7 @@
         "binaryDir": "${sourceDir}/build/win-release",
         "cacheVariables": {
           "CMAKE_BUILD_TYPE": "Release",
-          "CMAKE_TOOLCHAIN_FILE": "C:/Users/st544/Documents/GitHub/vcpkg/scripts/buildsystems/vcpkg.cmake",
+          "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
           "VCPKG_TARGET_TRIPLET": "x64-windows"
         }
       }
