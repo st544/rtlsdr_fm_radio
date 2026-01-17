@@ -4,8 +4,6 @@ project(rtlsdr_fm_radio LANGUAGES CXX)
 add_executable(FM_Radio src/main.cpp)
 set_target_properties(FM_Radio PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED YES)
 
-find_package(PThreads4W CONFIG REQUIRED)
-find_package(fmt CONFIG REQUIRED)
 find_package(rtlsdr CONFIG REQUIRED)
 find_package(portaudio CONFIG REQUIRED)
 
