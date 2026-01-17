@@ -41,13 +41,7 @@ jobs:
       - name: Export VCPKG_ROOT
         shell: pwsh
         run: |
-          echo "VCPKG_ROOT=${{ steps.vcpkg.outputs.vcpkgRoot }}" >> $env:GITHUB_ENV
-
-      - name: Debug vcpkgRoot
-        shell: pwsh
-        run: |
-          echo "vcpkgRoot=${{ steps.vcpkg.outputs.vcpkgRoot }}"
-          dir "${{ steps.vcpkg.outputs.vcpkgRoot }}\scripts\buildsystems"
+          echo "VCPKG_ROOT=${{ runner.temp }}" >> $env:GITHUB_ENV
 
       # Configure with a CI-safe toolchain path (from run-vcpkg output), not your local C:\Users\... path
       - name: Configure
