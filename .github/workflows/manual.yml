@@ -27,7 +27,7 @@ jobs:
         shell: pwsh
         run: |
           where cl
-          cl /Bv
+          cl /?
 
       # Clone/bootstrap vcpkg and install manifest dependencies (uses your vcpkg.json + builtin-baseline)
       - name: Setup vcpkg (manifest)
