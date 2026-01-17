@@ -29,6 +29,9 @@ jobs:
           where cl
           cl /?
 
+      - name: Setup Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
       # Clone/bootstrap vcpkg and install manifest dependencies (uses your vcpkg.json + builtin-baseline)
       - name: Setup vcpkg (manifest)
         id: vcpkg
@@ -41,7 +44,7 @@ jobs:
       - name: Export VCPKG_ROOT
         shell: pwsh
         run: |
-          echo "VCPKG_ROOT=${{ runner.temp }}" >> $env:GITHUB_ENV
+          echo "VCPKG_ROOT=${{ runner.temp }}/vcpkg" >> $env:GITHUB_ENV
 
       # Configure with a CI-safe toolchain path (from run-vcpkg output), not your local C:\Users\... path
       - name: Configure
