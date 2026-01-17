@@ -38,6 +38,12 @@ jobs:
           vcpkgDirectory: "${{ runner.temp }}/vcpkg"
           vcpkgJsonGlob: "**/vcpkg.json"
 
+      - name: Debug vcpkgRoot
+        shell: pwsh
+        run: |
+          echo "vcpkgRoot=${{ steps.vcpkg.outputs.vcpkgRoot }}"
+          dir "${{ steps.vcpkg.outputs.vcpkgRoot }}\scripts\buildsystems"
+
       # Configure with a CI-safe toolchain path (from run-vcpkg output), not your local C:\Users\... path
       - name: Configure
         shell: pwsh
