@@ -2,7 +2,9 @@
 #include <atomic>
 #include <cstring>
 #include <stdexcept>
+#include <algorithm>
 
+template <typename T>
 class CircularBuffer {
 public:
     explicit CircularBuffer(size_t size) : buffer(size), mask(size - 1) {
@@ -12,7 +14,7 @@ public:
     }
 
     // Producer function
-    size_t push(const float* data, size_t count) {
+    size_t push(const T* data, size_t count) { 
         size_t h = head_.load(std::memory_order_relaxed);
         size_t t = tail_.load(std::memory_order_acquire);
 
@@ -24,15 +26,15 @@ public:
         size_t idx = h & mask;
         size_t first = std::min(to_write, buffer.size() - idx);
 
-        std::memcpy(&buffer[idx], data, first * sizeof(float));
-        std::memcpy(&buffer[0], data + first, (to_write - first) * sizeof(float));
+        std::memcpy(&buffer[idx], data, first * sizeof(T));
+        std::memcpy(&buffer[0], data + first, (to_write - first) * sizeof(T));
 
         head_.store(h + to_write, std::memory_order_release);
         return to_write;
     }
 
     // Consumer function
-    size_t pop(float* out, size_t count) {
+    size_t pop(T* out, size_t count) {
         size_t h = head_.load(std::memory_order_acquire);
         size_t t = tail_.load(std::memory_order_relaxed);
 
@@ -44,8 +46,8 @@ public:
         size_t idx = t & mask;
         size_t first = std::min(to_read, buffer.size() - idx);
 
-        std::memcpy(out, &buffer[idx], first * sizeof(float));
-        std::memcpy(out + first, &buffer[0], (to_read - first) * sizeof(float));
+        std::memcpy(out, &buffer[idx], first * sizeof(T));
+        std::memcpy(out + first, &buffer[0], (to_read - first) * sizeof(T));
 
         tail_.store(t + to_read, std::memory_order_release);
         return to_read;
@@ -62,7 +64,7 @@ public:
     }
 
 private:
-    std::vector<float> buffer;
+    std::vector<T> buffer;
     size_t mask;
     std::atomic<size_t> head_{0};
     std::atomic<size_t> tail_{0};
