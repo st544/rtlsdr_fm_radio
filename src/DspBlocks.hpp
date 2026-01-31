@@ -2,23 +2,23 @@
 #include <cmath>
 #include <algorithm>
 
-// Fast FM Demodulator
-struct FmDemodFast {
+// FM Quadrature Demodulator
+struct FmDemod {
     std::complex<float> prev{1.0f, 0.0f};
 
     float push(std::complex<float> x) {
-        float I  = x.real(),  Q  = x.imag();
-        float Ip = prev.real(), Qp = prev.imag();
-        prev = x;
+        // Calculate phase difference between current sample (x) and previous (prev)
+        // result is x * conj(prev)
+        float re = x.real() * prev.real() + x.imag() * prev.imag();
+        float im = x.imag() * prev.real() - x.real() * prev.imag();
+        
+        prev = x; // Update state
 
-        // numerator ~ sin(Δφ), denominator ~ cos(Δφ)
-        float num = I*Qp - Q*Ip;
-        float den = I*Ip + Q*Qp;
-
-        // For small angles, num/den ≈ Δφ. Add epsilon to avoid blowups.
-        return num / (den + 1e-12f);
+        // Standard atan2 extracts the exact angle in radians (-pi to +pi)
+        return std::atan2(im, re);
     }
 };
+
 
 // Audio DC Blocker (High Pass)
 struct DcBlocker {
@@ -45,17 +45,33 @@ struct IQDcBlocker {
     }
 };
 
-// Standard De-emphasis filter (IIR)
-struct Deemphasis {
-    float y = 0.0f;
-    float a;
+// Biquad De-emphasis filter (2nd order IIR)
+struct DeemphasisBiquad {
+    float b0, b1, a1;
+    float x1 = 0.0f;
+    float y1 = 0.0f;
 
-    Deemphasis(float tau, float fs) {
-        float dt = 1.0f / fs;
-        a = dt / (tau + dt);
+    DeemphasisBiquad(float sampleRate, float tau = 75e-6f) {
+        // Digital model of an analog RC Low Pass Filter
+        // Transfer function H(s) = 1 / (1 + s*tau)
+        // Bilinear transform substitution s -> (2/T) * (1-z^-1)/(1+z^-1)
+        
+        float T = 1.0f / sampleRate;
+        float k = 2.0f * tau; 
+        
+        // Resulting coefficients
+        float norm = T + k;
+        b0 = T / norm;
+        b1 = T / norm;
+        a1 = (T - k) / norm;
     }
+
     float push(float x) {
-        y += a * (x - y);
+        // Difference equation y[n] = b0*x[n] + b1*x[n-1] - a1*y[n-1]
+        float y = b0 * x + b1 * x1 - a1 * y1;
+        
+        x1 = x;
+        y1 = y;
         return y;
     }
 };
@@ -86,3 +102,39 @@ inline float softclip(float x) {
         return (x > 0.0f) ? (2.0f/3.0f) : (-2.0f/3.0f);
     }
 }
+
+// Notch Filter
+struct NotchFilter19k {
+    float b0, b1, b2, a1, a2;
+    float x1 = 0.0f, x2 = 0.0f, y1 = 0.0f, y2 = 0.0f;
+
+    NotchFilter19k(float sampleRate) {
+        float fc = 19000.0f;
+        float Q = 10.0f;
+
+        float w0 = 2.0f * 3.141592654f * fc / sampleRate;
+        float alpha = std::sin(w0) / (2.0f * Q);
+        float cosw0 = std::cos(w0);
+
+        float a0 = 1.0f + alpha;
+        b0 = 1.0f / a0;
+        b1 = -2.0f * cosw0 / a0;
+        b2 = 1.0f / a0;
+        a1 = -2.0f * cosw0 / a0;
+        a2 = 1.0f - alpha / a0;
+
+    }
+
+    float push(float x) {
+        // Direct Form I difference equation
+        float y = b0*x + b1*x1 + b2*x2 - a1*y1 - a2*y2;
+
+        // Shift state
+        x2 = x1;
+        x1 = x;
+        y2 = y1;
+        y1 = y;
+
+        return y;
+    }
+};
