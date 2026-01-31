@@ -13,13 +13,32 @@
 #include "DSPBlocks.hpp"
 #include "CircularBuffer.hpp"
 
-static std::atomic<uint64_t> g_bytes{0};
 static std::atomic<uint64_t> g_underruns{0};
+static std::atomic<bool> g_stop_requested{false};
+std::atomic<bool> running{true};
+std::atomic<bool> reader_finished{false};
 
-static void rtlsdr_cb(unsigned char* buf, uint32_t len, void* /*ctx*/) {
-    g_bytes.fetch_add(len, std::memory_order_relaxed);
+// Context struct for rtlsdr async callback
+struct AsyncContext {
+    CircularBuffer<uint8_t>* iq;        // IQ buffer
+    std::atomic<uint64_t>* dropped;     // dropped packets if buffer is full
+};
+
+// RTLSDR async callback
+static void rtlsdr_async_cb(unsigned char* buf, uint32_t len, void* ctx_void) {
+    auto* ctx = reinterpret_cast<AsyncContext*>(ctx_void);
+
+    // Push RTLSDR async data directly into IQ buffer
+    size_t written = ctx->iq->push(reinterpret_cast<uint8_t*>(buf), len);
+
+    // Track dropped packets if buffer is full
+    if (written < len) {
+        ctx->dropped->fetch_add(len - written, std::memory_order_relaxed);
+    }
 }
 
+
+// Audiostreaming callback
 static int paCallback(const void* input, void* output, 
                         unsigned long frameCount,
                         const PaStreamCallbackTimeInfo* timeInfo,
@@ -28,7 +47,7 @@ static int paCallback(const void* input, void* output,
 {
 
     float* out = (float*)output;
-    auto* ring = reinterpret_cast<CircularBuffer*>(userData);
+    auto* ring = reinterpret_cast<CircularBuffer<float>*>(userData);
 
     size_t read = ring->pop(out, frameCount);               // read 'frameCount' samples
     if (read < frameCount) {
@@ -38,15 +57,16 @@ static int paCallback(const void* input, void* output,
     return paContinue;
 }
 
-std::atomic<bool> running{true};
 
 //Ctrl-C signal handler
 void ctrlC_Invoked(int s)
 {
 	std::cout<<"\nStopping loop..."<<std::endl;
     running = false;
-	
+
+    g_stop_requested.store(true, std::memory_order_relaxed);
 }
+
 
 
 int main(int argc, char* argv[]) { 
@@ -113,21 +133,30 @@ int main(int argc, char* argv[]) {
     // Instantiate dsp blocks
     FIRFilter<std::complex<float>> LPF(5, radio_taps);         // First stage LPF decimator
     FIRFilter<float> audio_LPF(10, audio_taps);                // Second stage anti-aliasing LPF decimator
-    FmDemodFast demod;                                         // demodulator
-    Deemphasis deemph(75e-6f, (float)fa);                      // 1-pole IIR audio rate
+    NotchFilter19k pilot_notch(fa);                         // 19kHz notch filter
+    FmDemod demod;                                         // demodulator
+    DeemphasisBiquad deemph(75e-6f, (float)fa);                      // 1-pole IIR audio rate
     DcBlocker dc;
     IQDcBlocker iq_dc;
     SimpleAgc agc;
 
-    CircularBuffer audio_ring(32768);      // Declare audio ring buffer
-    std::vector<float> outBlock(512);       // output block for audio ring buffer
+    // IQ ring buffer for rtlsdr_async_read 
+    CircularBuffer<uint8_t> iq_ring(1<<20);     // 1MB
+    CircularBuffer<float> fft_ring(32768);      // Buffer for visualizer
+    std::atomic<uint64_t> iq_dropped{0};
+    AsyncContext actx{&iq_ring, &iq_dropped};   // Declare async context struct for buffer
+
+    // Audio ring buffer
+    CircularBuffer<float> audio_ring(32768);      
+    std::vector<float> outBlock(512);           // output block for audio ring buffer
     size_t outCount = 0;
     PaStream* stream = nullptr;
     unsigned long framesPerBuffer = 1024;
     bool stream_started = false;
     const size_t prime_target = framesPerBuffer * 20;    // ~0.4s
 
-    std::vector<uint8_t> buf(16384);        // buffer for wav file
+    // Audio file buffer
+    std::vector<uint8_t> buf(16384);      
     uint64_t audio_written = 0;
     const uint64_t target_audio = (uint64_t)fa * 10;    // 10 seconds
     std::vector<float> audio;
@@ -170,67 +199,98 @@ int main(int argc, char* argv[]) {
     ///////////////////////////////////
     std::cout << "Beginning DSP pipeline" <<std::endl;
 
-    while (running) {
-        int n_read = 0;
-        int r = rtlsdr_read_sync(dev, buf.data(), (int)buf.size(), &n_read);
-        if (r != 0) break;
+    // Start async reader
+    std::thread reader([&]{
+        rtlsdr_read_async(dev, rtlsdr_async_cb, &actx, 0, 16384);
 
-        // n_read bytes, interleaved I,Q
-        for (int i = 0; i + 1 < n_read; i += 2) {
-            float I = lut[buf[i]];
-            float Q = lut[buf[i+1]];
-            std::complex<float> x(I, Q);
-            std::complex<float> x1;
-            iq_dc.process(x);                       // IQ DC blocker
-            if (!LPF.Filter(x,x1)) continue;        // First stage LPF 
-            float fm = demod.push(x1);              // demodulate
-            fm = std::clamp(fm, -limit, limit);     // remove bad phase jumps
-            fm = dc.push(fm);                       // audio DC blocker 
+        reader_finished.store(true, std::memory_order_release);
+    });
 
-            float a1;
-            if (!audio_LPF.Filter(fm, a1)) continue;    // Second stage LPF - 48kS/s output
-            float y = deemph.push(a1);                  // IIR filter
-            float s = agc.apply(y);                     // Automatic gain control
-            float volume_knob = 1.0f;                   // volume control
-            s *= volume_knob;
+    // Start thread for DSP pipeline
+    std::thread dsp([&] {
+        std::vector<uint8_t> iqbuf(16384);
+        std::vector<float> outBlock(512);
+        size_t outCount = 0;
 
-            s = softclip(s);                // cubic soft clip
+        while (!reader_finished.load(std::memory_order_acquire) || iq_ring.read_available() > 0) {
 
+            // Force exit if Ctrl+C is used
+            if (!running.load(std::memory_order_relaxed) && iq_ring.read_available() == 0) {
+                break;
+            }
 
-            if (live_stream) {
-                // Start stream after buffer has been filled to initial target
-                if (!stream_started && audio_ring.read_available() >= prime_target) {
-                    Pa_StartStream(stream);
-                    stream_started = true;
-                }
+            size_t n = iq_ring.pop(iqbuf.data(), iqbuf.size());
+            if (n == 0) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                continue;
+            }
 
-                outBlock[outCount++] = s;
-                if (outCount == outBlock.size()) {
-                    audio_ring.push(outBlock.data(), outCount);
-                    outCount = 0;
+            // n_read bytes, interleaved I,Q
+            for (int i = 0; i + 1 < n; i += 2) {
+                float I = lut[iqbuf[i]];
+                float Q = lut[iqbuf[i+1]];
+                std::complex<float> x(I, Q);
+                std::complex<float> x1;
+                iq_dc.process(x);                       // IQ DC blocker
+                if (!LPF.Filter(x,x1)) continue;        // First stage LPF 
+                float fm = demod.push(x1);              // demodulate
+                fm = std::clamp(fm, -limit, limit);     // remove bad phase jumps
+                fm = dc.push(fm);                       // audio DC blocker 
 
-                    if (audio_ring.read_available() > 48000) { // > 1 second buffered
-                        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                float a1;
+                if (!audio_LPF.Filter(fm, a1)) continue;    // Second stage LPF - 48kS/s output
+                float y = pilot_notch.push(a1);
+                y = deemph.push(y);                         // IIR filter
+                float s = agc.apply(y);                     // Automatic gain control
+                float volume_knob = 1.2f;                   // volume control
+                s *= volume_knob;
+
+                s = softclip(s);                // cubic soft clip
+
+                
+                if (live_stream) {
+                    // Start stream after buffer has been filled to initial target
+                    if (!stream_started && audio_ring.read_available() >= prime_target) {
+                        Pa_StartStream(stream);
+                        stream_started = true;
+                    }
+
+                    outBlock[outCount++] = s;
+                    if (outCount == outBlock.size()) {
+                        audio_ring.push(outBlock.data(), outCount);
+                        outCount = 0;
                     }
                 }
-
-                static auto last = std::chrono::steady_clock::now();
-                auto now = std::chrono::steady_clock::now();
-                if (now - last > std::chrono::seconds(1)) {
-                    last = now;
-                    std::cout << "ring_avail=" << audio_ring.read_available()
-                            << " underruns=" << g_underruns.load() << "\n";
+                else {
+                    audio.push_back(s);
+                    if (audio.size() >= target_audio) {
+                        running.store(false, std::memory_order_relaxed);
+                        break;
+                    }
                 }
-            
             }
-            else {
-                audio.push_back(s);
-                if (audio.size() >= target_audio) running = false;
-            }
+
         }
+
+    });
+
+    while (running.load(std::memory_order_relaxed)) {
+        if (g_stop_requested.load(std::memory_order_relaxed)) {
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
 
-    rtlsdr_close(dev);
+    // stop async read
+    rtlsdr_cancel_async(dev);
+    reader.join();
+
+    // Stop DSP thread
+    running.store(false, std::memory_order_relaxed);
+    dsp.join();
+
+
+    rtlsdr_close(dev);      // Close device
 
 
     if (live_stream) {
