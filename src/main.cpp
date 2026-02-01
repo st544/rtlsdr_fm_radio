@@ -12,6 +12,9 @@
 #include "FIRFilter.hpp"
 #include "DSPBlocks.hpp"
 #include "CircularBuffer.hpp"
+#include "SpectrumBuffer.hpp"
+#include "WaterfallBuffer.hpp"
+#include "RfFFTAnalyzer.hpp"
 
 static std::atomic<uint64_t> g_underruns{0};
 static std::atomic<bool> g_stop_requested{false};
@@ -59,6 +62,14 @@ static int paCallback(const void* input, void* output,
 }
 
 
+static double now_seconds() {
+    using clock = std::chrono::steady_clock;
+    static auto t0 = clock::now();
+    auto t = clock::now();
+    return std::chrono::duration<double>(t - t0).count();
+}
+
+
 //Ctrl-C signal handler
 void ctrlC_Invoked(int s)
 {
@@ -77,10 +88,20 @@ int main(int argc, char* argv[]) {
 
     // Parse arguments
     bool live_stream = false;
-    if (argc > 1 && std::strcmp(argv[1], "--stream") == 0) {
-        live_stream = true;
+    bool record_mode = false;
+    std::ofstream raw_dump;
+
+    for(int i=1; i<argc; i++) {
+        if (std::strcmp(argv[i], "--record") == 0) record_mode = true;
+        if (std::strcmp(argv[i], "--stream") == 0) live_stream = true;
     }
-    
+
+    // Record mode
+    if (record_mode) {
+        raw_dump.open("raw_iq_samples.bin", std::ios::binary);
+        std::cout << "Recording raw IQ to raw_iq_samples.bin..." << std::endl;
+    }
+
     ////////////////////////////////////////////////////////
     // Initialization
     ////////////////////////////////////////////////////////
@@ -146,7 +167,6 @@ int main(int argc, char* argv[]) {
 
     // IQ ring buffer for rtlsdr_async_read 
     CircularBuffer<uint8_t> iq_ring(1<<20);     // 1MB
-    CircularBuffer<float> fft_ring(32768);      // Buffer for visualizer
     std::atomic<uint64_t> iq_dropped{0};
     AsyncContext actx{&iq_ring, &iq_dropped};   // Declare async context struct for buffer
 
@@ -164,6 +184,12 @@ int main(int argc, char* argv[]) {
     std::vector<float> audio;
     audio.reserve(target_audio * 2);
     int cnt = 0;
+
+    // RF Visualizer buffers
+    CircularBuffer<float> fft_ring(1<<18);      // Buffer for RF visualizer
+    std::vector<float> rf_block;
+    rf_block.reserve(4096 * 2);
+
 
     // LUT for byte to float conversion
     float lut[256];
@@ -226,6 +252,11 @@ int main(int argc, char* argv[]) {
                 continue;
             }
 
+            // Record raw IQ data samples to file
+            if (record_mode && raw_dump.is_open()) {
+                raw_dump.write(reinterpret_cast<char*>(iqbuf.data()), n);
+            }
+
             // n_read bytes, interleaved I,Q
             for (int i = 0; i + 1 < n; i += 2) {
                 float I = lut[iqbuf[i]];
@@ -234,6 +265,15 @@ int main(int argc, char* argv[]) {
                 std::complex<float> x1;
                 iq_dc.process(x);                       // IQ DC blocker
                 if (!LPF.Filter(x,x1)) continue;        // First stage LPF 
+
+                // Push to FFT ring buffer for visualizer
+                rf_block.push_back(x1.real());
+                rf_block.push_back(x1.imag());
+                if (rf_block.size() == 4096 * 2) {
+                    size_t written = fft_ring.push(rf_block.data(), rf_block.size());
+                    rf_block.clear();
+                }
+
                 float fm = demod.push(x1);              // demodulate
                 fm = std::clamp(fm, -limit, limit);     // remove bad phase jumps
                 fm = dc.push(fm);                       // audio DC blocker 
@@ -292,6 +332,50 @@ int main(int argc, char* argv[]) {
 
     });
 
+
+    // Start RF Analyzer thread
+    const int Nfft = 2048;
+    const int wf_height = 400;
+    RfFFTAnalyzer rf_fft(Nfft, (int)fq);
+    SpectrumBuffer rf_spec(Nfft);
+    WaterfallBuffer rf_waterfall(wf_height, Nfft);
+
+    std::thread rf_analyzer([&] {
+        const int hop_complex = 512;
+        const int hop_floats = hop_complex * 2;
+        const int frame_floats = Nfft * 2;
+
+        std::vector<float> fifo;
+        fifo.reserve(frame_floats * 2);
+
+        std::vector<float> tmp(hop_floats);
+        std::vector<float> frame(frame_floats);
+
+        while (running.load(std::memory_order_relaxed) || fft_ring.read_available() > 0) {
+            if (fft_ring.pop(tmp.data(), hop_floats) != (size_t)hop_floats) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                continue;
+            }
+
+            fifo.insert(fifo.end(), tmp.begin(), tmp.end());
+
+            while ((int)fifo.size() >= frame_floats) {
+                std::copy(fifo.begin(), fifo.begin() + frame_floats, frame.begin());
+
+                float* w = rf_spec.write_ptr();
+                rf_fft.compute_db_shifted(frame.data(), w);
+                rf_spec.publish(now_seconds());
+
+                rf_waterfall.push_row(w);
+
+                // overlap: drop hop
+                fifo.erase(fifo.begin(), fifo.begin() + hop_floats);
+            }
+        }
+
+    });
+
+
     while (running.load(std::memory_order_relaxed)) {
         if (g_stop_requested.load(std::memory_order_relaxed)) {
             break;
@@ -317,7 +401,7 @@ int main(int argc, char* argv[]) {
         Pa_Terminate();  
     }
     else {
-        std::cout<<"Audio buffer filled. Saving to out.wav file..."<<std::endl;
+        std::cout<<"Audio buffer filled. Saving to stereo_out.wav file..."<<std::endl;
 
         // Initialize .wav file
         AudioFile<float> wav;
