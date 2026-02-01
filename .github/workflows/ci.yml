@@ -30,3 +30,10 @@ jobs:
 
       - name: Build
         run: cmake --build --preset build-release
+
+      - name: Run Integration Test
+        shell: cmd
+        run: |
+          copy raw_iq_samples.bin build\Release\
+          cd build\Release
+          .\DSPPipelineTest.exe
