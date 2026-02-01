@@ -138,3 +138,44 @@ struct NotchFilter19k {
         return y;
     }
 };
+
+
+struct StereoSeparator {
+    // PLL
+    float alpha = 0.01f;    // Loop gain
+    float beta = 0.0001f;   // Integrator gain
+    float phase = 0.0f;
+    float freq = 19000.0f;  // Estimated pilot freq
+    float freq_nominal = 19000.0f;
+    float sampleRate;
+
+    // Stereo
+    float pilot_lock_level = 0.0f; 
+    bool is_stereo = false;
+
+    StereoSeparator(float fs) : sampleRate(fs) {}
+
+    // Returns pair {L+R (Mono), L-R (Stereo Diff)} from raw RF input signal
+    std::pair<float, float> process(float x) {
+
+        // PLL - Update Phase
+        float dt = 1.0f / sampleRate;
+        phase += freq * dt * 2.0f * 3.141592654f;
+        if (phase > 2.0f * 3.141592654f) phase -= 2.0f * 3.141592654f;
+
+        // PLL - Calculate Error
+        float pll_error = x * std::sin(phase); 
+
+        // PLL - Update Frequency
+        freq += beta * pll_error;
+        phase += alpha * pll_error;     // adjust phase to lock
+
+        // Generate 38kHz Carrier
+        float carrier = std::sin(2.0f * phase) * 2.0f;
+
+        // Demodulate
+        float diff = x * carrier;
+
+        return {x, diff};
+    }
+};

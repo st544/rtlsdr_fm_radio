@@ -37,7 +37,6 @@ static void rtlsdr_async_cb(unsigned char* buf, uint32_t len, void* ctx_void) {
     }
 }
 
-
 // Audiostreaming callback
 static int paCallback(const void* input, void* output, 
                         unsigned long frameCount,
@@ -49,8 +48,10 @@ static int paCallback(const void* input, void* output,
     float* out = (float*)output;
     auto* ring = reinterpret_cast<CircularBuffer<float>*>(userData);
 
-    size_t read = ring->pop(out, frameCount);               // read 'frameCount' samples
-    if (read < frameCount) {
+    size_t samples_needed = frameCount * 2;
+
+    size_t read = ring->pop(out, samples_needed);               // read 'frameCount' samples
+    if (read < samples_needed) {
         std::fill(out + read, out + frameCount, 0.0f);      // If buffer empty, fill rest with silence
         g_underruns.fetch_add(1, std::memory_order_relaxed);
     }
@@ -131,14 +132,17 @@ int main(int argc, char* argv[]) {
     ////////////////////////////////////////////////////////
 
     // Instantiate dsp blocks
-    FIRFilter<std::complex<float>> LPF(5, radio_taps);         // First stage LPF decimator
-    FIRFilter<float> audio_LPF(10, audio_taps);                // Second stage anti-aliasing LPF decimator
-    NotchFilter19k pilot_notch(fa);                         // 19kHz notch filter
-    FmDemod demod;                                         // demodulator
-    DeemphasisBiquad deemph(75e-6f, (float)fa);                      // 1-pole IIR audio rate
-    DcBlocker dc;
-    IQDcBlocker iq_dc;
-    SimpleAgc agc;
+    FIRFilter<std::complex<float>> LPF(5, radio_taps);          // First stage LPF decimator
+    StereoSeparator stereo(fq);                                 // Separates mono and stereo diff signals
+    FIRFilter<float> LPF_mono(10, audio_taps);                  // Second stage anti-aliasing LPF decimator - mono
+    FIRFilter<float> LPF_diff(10, audio_taps);                  // Second stage anti-aliasing LPF decimator - stereo diff
+    NotchFilter19k pilot_notch(fa);                             // 19kHz notch filter
+    FmDemod demod;                                              // demodulator
+    DeemphasisBiquad deemph_L(75e-6f, (float)fa);               // 1-pole IIR audio rate - L
+    DeemphasisBiquad deemph_R(75e-6f, (float)fa);               // 1-pole IIR audio rate - R
+    DcBlocker dc;                                               // audio DC blocker
+    IQDcBlocker iq_dc;                                          // IQ DC blocker
+    SimpleAgc agc;                                              // automatic gain control
 
     // IQ ring buffer for rtlsdr_async_read 
     CircularBuffer<uint8_t> iq_ring(1<<20);     // 1MB
@@ -147,20 +151,19 @@ int main(int argc, char* argv[]) {
     AsyncContext actx{&iq_ring, &iq_dropped};   // Declare async context struct for buffer
 
     // Audio ring buffer
-    CircularBuffer<float> audio_ring(32768);      
-    std::vector<float> outBlock(512);           // output block for audio ring buffer
-    size_t outCount = 0;
+    CircularBuffer<float> audio_ring(65536);      
+    std::vector<float> stereo_out_block(1024);          // interleaved (L,R) output block
+    int idx = 0;
     PaStream* stream = nullptr;
     unsigned long framesPerBuffer = 1024;
     bool stream_started = false;
     const size_t prime_target = framesPerBuffer * 20;    // ~0.4s
 
     // Audio file buffer
-    std::vector<uint8_t> buf(16384);      
-    uint64_t audio_written = 0;
     const uint64_t target_audio = (uint64_t)fa * 10;    // 10 seconds
     std::vector<float> audio;
-    audio.reserve(target_audio);
+    audio.reserve(target_audio * 2);
+    int cnt = 0;
 
     // LUT for byte to float conversion
     float lut[256];
@@ -180,7 +183,7 @@ int main(int argc, char* argv[]) {
         PaError err = Pa_OpenDefaultStream(
             &stream,
             0,                // no input
-            1,                // mono output
+            2,                // stereo output
             paFloat32,
             fa,
             framesPerBuffer,
@@ -190,8 +193,6 @@ int main(int argc, char* argv[]) {
         if (err != paNoError) {
             std::cerr<<"PortAudio Open Stream Error: " << Pa_GetErrorText(err) << std::endl; 
         }
-
-
     }
 
     ///////////////////////////////////
@@ -237,35 +238,52 @@ int main(int argc, char* argv[]) {
                 fm = std::clamp(fm, -limit, limit);     // remove bad phase jumps
                 fm = dc.push(fm);                       // audio DC blocker 
 
-                float a1;
-                if (!audio_LPF.Filter(fm, a1)) continue;    // Second stage LPF - 48kS/s output
-                float y = pilot_notch.push(a1);
-                y = deemph.push(y);                         // IIR filter
-                float s = agc.apply(y);                     // Automatic gain control
-                float volume_knob = 1.2f;                   // volume control
-                s *= volume_knob;
+                auto [raw_mono, raw_diff] = stereo.process(fm);     // stereo separator - 480kS/s
 
-                s = softclip(s);                // cubic soft clip
+                float mono_out, diff_out;
+                bool mono_ready = LPF_mono.Filter(raw_mono, mono_out);  // Second stage LPF - mono - 48kS/s
+                bool diff_ready = LPF_diff.Filter(raw_diff, diff_out);  // Second stage LPF - diff - 48kS/s
 
-                
-                if (live_stream) {
-                    // Start stream after buffer has been filled to initial target
-                    if (!stream_started && audio_ring.read_available() >= prime_target) {
-                        Pa_StartStream(stream);
-                        stream_started = true;
+                if (mono_ready && diff_ready) {
+                    mono_out = pilot_notch.push(mono_out);      // Notch filter 19kHz
+
+                    float left = (mono_out + diff_out);         // Matrix L+R
+                    float right = (mono_out - diff_out);
+
+                    left = deemph_L.push(left);                 // Deemphasis IIR L+R
+                    right = deemph_R.push(right);
+
+                    left = agc.apply(left);             // Automatic gain control
+                    right = agc.apply(right);
+
+                    float volume_knob = 1.2f;           // Volume control
+                    left *= volume_knob;
+                    right *= volume_knob;
+
+                    left = softclip(left);              // soft clip
+                    right = softclip(right);
+
+                    if (live_stream) {
+                        // Start stream after buffer has been filled to initial target
+                        if (!stream_started && audio_ring.read_available() >= prime_target) {
+                            Pa_StartStream(stream);
+                            stream_started = true;
+                        }
+
+                        stereo_out_block[idx++] = left;     // Push to interleaved stereo buffer
+                        stereo_out_block[idx++] = right;
+                        if (idx == stereo_out_block.size()) {
+                            audio_ring.push(stereo_out_block.data(), idx);
+                            idx = 0;
+                        }
                     }
-
-                    outBlock[outCount++] = s;
-                    if (outCount == outBlock.size()) {
-                        audio_ring.push(outBlock.data(), outCount);
-                        outCount = 0;
-                    }
-                }
-                else {
-                    audio.push_back(s);
-                    if (audio.size() >= target_audio) {
-                        running.store(false, std::memory_order_relaxed);
-                        break;
+                    else {
+                        audio.push_back(left);
+                        audio.push_back(right);
+                        if (audio.size() >= target_audio * 2) {
+                            running.store(false, std::memory_order_relaxed);
+                            break;
+                        }
                     }
                 }
             }
@@ -303,14 +321,15 @@ int main(int argc, char* argv[]) {
 
         // Initialize .wav file
         AudioFile<float> wav;
-        wav.setNumChannels(1);
-        wav.setNumSamplesPerChannel((int)audio.size());    // 10 seconds
+        wav.setNumChannels(2);
+        wav.setNumSamplesPerChannel((int)audio.size()/2);    // 10 seconds
         wav.setSampleRate(fa);
 
-        for (int i = 0; i < audio.size(); i++) {
-            wav.samples[0][i] = audio[i];
+        for (size_t i = 0; i < audio.size(); i += 2) {
+            wav.samples[0][i/2] = audio[i];
+            wav.samples[1][i/2] = audio[i+1];
         }
-        wav.save("out.wav");
+        wav.save("stereo_out.wav");
     }
 
     return 0;
