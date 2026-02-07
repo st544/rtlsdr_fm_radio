@@ -1,7 +1,13 @@
 {
-    "name": "rtlsdr-fm-radio",
-    "version-string": "0.1.0",
-    "builtin-baseline": "af752f21c9d79ba3df9cb0250ce2233933f58486",
-    "dependencies": [ "rtlsdr", "portaudio", "fftw3" ]
-  }
+  "name": "rtlsdr-fm-radio",
+  "version-string": "0.1.0",
+  "builtin-baseline": "af752f21c9d79ba3df9cb0250ce2233933f58486",
+  "dependencies": [
+    "rtlsdr",
+    "portaudio",
+    "fftw3",
+    "sdl2", 
+    "glad"
+  ]
+}
   

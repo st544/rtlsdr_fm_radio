@@ -15,6 +15,8 @@
 #include "SpectrumBuffer.hpp"
 #include "WaterfallBuffer.hpp"
 #include "RfFFTAnalyzer.hpp"
+#include "UiApp.hpp"
+
 
 static std::atomic<uint64_t> g_underruns{0};
 static std::atomic<bool> g_stop_requested{false};
@@ -186,7 +188,7 @@ int main(int argc, char* argv[]) {
     int cnt = 0;
 
     // RF Visualizer buffers
-    CircularBuffer<float> fft_ring(1<<18);      // Buffer for RF visualizer
+    CircularBuffer<float> fft_ring(1<<20);      // Buffer for RF visualizer
     std::vector<float> rf_block;
     rf_block.reserve(4096 * 2);
 
@@ -264,15 +266,16 @@ int main(int argc, char* argv[]) {
                 std::complex<float> x(I, Q);
                 std::complex<float> x1;
                 iq_dc.process(x);                       // IQ DC blocker
-                if (!LPF.Filter(x,x1)) continue;        // First stage LPF 
 
                 // Push to FFT ring buffer for visualizer
-                rf_block.push_back(x1.real());
-                rf_block.push_back(x1.imag());
+                rf_block.push_back(x.real());
+                rf_block.push_back(x.imag());
                 if (rf_block.size() == 4096 * 2) {
                     size_t written = fft_ring.push(rf_block.data(), rf_block.size());
                     rf_block.clear();
                 }
+
+                if (!LPF.Filter(x,x1)) continue;        // First stage LPF 
 
                 float fm = demod.push(x1);              // demodulate
                 fm = std::clamp(fm, -limit, limit);     // remove bad phase jumps
@@ -336,7 +339,7 @@ int main(int argc, char* argv[]) {
     // Start RF Analyzer thread
     const int Nfft = 2048;
     const int wf_height = 400;
-    RfFFTAnalyzer rf_fft(Nfft, (int)fq);
+    RfFFTAnalyzer rf_fft(Nfft, (int)fs);
     SpectrumBuffer rf_spec(Nfft);
     WaterfallBuffer rf_waterfall(wf_height, Nfft);
 
@@ -375,6 +378,14 @@ int main(int argc, char* argv[]) {
 
     });
 
+
+    // Instantiate UIApp struct and call run method
+    UiAppConfig cfg;
+    cfg.fft_size = Nfft;                // 2048 
+    cfg.rf_sample_rate = fs;           
+    cfg.center_freq_hz = fc;            // 93.3MHz
+
+    UiApp::Run(cfg, rf_spec, rf_waterfall);
 
     while (running.load(std::memory_order_relaxed)) {
         if (g_stop_requested.load(std::memory_order_relaxed)) {
