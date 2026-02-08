@@ -427,8 +427,8 @@ int main(int argc, char* argv[]) {
     cfg.rf_sample_rate = fs;           
     cfg.center_freq_hz = fc;            // 93.3MHz
 
+    // Blocks until window is closed
     UiApp::Run(cfg, rf_spec, rf_waterfall);
-
 
     // stop async read
     rtlsdr_cancel_async(dev);

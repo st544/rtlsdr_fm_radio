@@ -13,18 +13,6 @@
 #include "backends/imgui_impl_opengl3.h"
 
 
-/*
-creates a window + GL context
-
-initializes ImGui + ImPlot
-
-every frame:
-
-reads rf_spec.latest() (no copies besides what ImPlot needs)
-
-linearizes the waterfall into a contiguous vector (for PlotHeatmap)
-*/
-
 static void BuildFreqAxis(std::vector<float>& x_khz, int N, int fs_hz) {
     x_khz.resize(N);
     const float df = (float)fs_hz / (float)N / 1000.0f;
@@ -112,12 +100,16 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
             if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_CLOSE) quit = true;
         }
 
+
         // New frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
         // ---- Controls ----
+        ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(250, 720), ImGuiCond_FirstUseEver);
+
         ImGui::Begin("Controls");
         ImGui::Text("Center: %.3f MHz", cfg.center_freq_hz / 1e6);
         ImGui::Text("RF rate: %d Hz", cfg.rf_sample_rate);
@@ -129,7 +121,21 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
         ImGui::SliderFloat("Smooth alpha", &smooth_alpha, 0.0f, 0.98f);
         ImGui::SliderFloat("WF dB min", &wf_db_min, -180.0f, 0.0f);
         ImGui::SliderFloat("WF dB max", &wf_db_max, -180.0f, 0.0f);
+
+        ImGui::Spacing();
+
+        if (ImGui::Button("Reset Defaults")) {
+            spec_db_min = -60.0f;
+            spec_db_max = -20.0f;
+            smooth_alpha = 0.75f;
+            wf_db_min = -60.0f;
+            wf_db_max = -20.0f;
+        }
+
+        ImGui::Text("Center: %.3f MHz", cfg.center_freq_hz / 1e6);
+
         ImGui::End();
+
 
         // Snapshot the latest data (no heavy copies)
         const SpectrumFrame& spec = rf_spec.latest();
@@ -159,6 +165,9 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
 
 
         // ---- Spectrum Plot ----
+        ImGui::SetNextWindowPos(ImVec2(250, 0), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(1030, 720), ImGuiCond_FirstUseEver);
+
         ImGui::Begin("RF View");
 
         if (ImPlot::BeginPlot("Spectrum", ImVec2(-1, 260))) {
@@ -178,7 +187,6 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
         }
 
         ImGui::Spacing();
-
         
         // ---- Waterfall Heatmap ----
         // X-Axis: Frequency in kHz 

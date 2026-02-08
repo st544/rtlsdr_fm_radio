@@ -34,7 +34,7 @@ public:
 
             // Calculate source index in circular buffer
             int src_row_idx = (write_row - 1 - i);
-            if (src_row_idx < 0) src_row_idx += H;
+            if (src_row_idx < 0) src_row_idx += H;      // Handles wrap
 
             // Copy row
             const float* src = &data[src_row_idx * B];

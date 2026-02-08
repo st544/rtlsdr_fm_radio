@@ -2,11 +2,11 @@
 
 A real-time, multi-threaded Software Defined Radio (SDR) receiver written in C++20. 
 
-This project implements a complete Digital Signal Processing (DSP) pipeline that interfaces with RTL-SDR hardware to demodulate FM Broadcast signals. It features a custom Stereo Decoder, real-time Spectral Analysis, and a lock-free double-buffered architecture for high-throughput processing.
-
 <p align="center">
   <img src="assets/GUI_020726.PNG" width="800" title="GUI Screenshot">
 </p>
+
+This project implements a complete Digital Signal Processing (DSP) pipeline that interfaces with RTL-SDR hardware to demodulate FM Broadcast signals. It features live streaming audio from FM radio stations, a custom stereo decoder, and real-time RF spectral analysis.
 
 ## Core Features
 
@@ -19,22 +19,22 @@ This project implements a complete Digital Signal Processing (DSP) pipeline that
     * **Communication:** Uses `std::atomic` lock-free ring buffers to pass 2.4 MS/s I/Q data between threads.
     * **Modern C++:** Utilizes C++20 standards (Templates, Atomics, Smart Pointers).
 * **Testing & CI:**
-    * **Automated Verification:** GitHub Actions pipeline runs integration tests on every commit.
+    * **Automated Verification:** GitHub Actions pipeline runs build and integration tests on every commit.
     * **Hardware Simulation:** Validates signal integrity (SNR) and filter logic using pre-recorded raw RF samples. 
 
 ## DSP Pipeline Architecture
 
 ```mermaid
 graph LR
-    RTL[RTL-SDR Hardware] -->|2.4 MS/s I/Q| RingBuf[Lock-Free Ring Buffer]
-    RingBuf -->|Async Read| DSP[DSP Thread]
+    RTL[RTL-SDR Hardware] -->|2.4 MS/s I/Q| RingBuf[Ring Buffer]
+    RingBuf -->|Async Read| DSP[DSP Pipeline]
     
     subgraph DSP Pipeline
-        DC[IQ DC Blocker] --> LPF1[FIR Decimator / 5]
+        DC[IQ DC Blocker] --> |2.4 MS/s| LPF1[LPF Decimator]
         LPF1 -->|480 kS/s| Demod[FM Demodulator]
-        Demod -->|MPX Signal| Stereo[Stereo Separator / PLL]
-        Stereo -->|L+R / L-R| Matrix[Stereo Matrixing]
-        Matrix -->|L / R| Deemph[De-emphasis & Notch]
+        Demod -->|MPX Signal| Stereo[PLL]
+        Stereo -->|L+R / L-R| Matrix[LPF / Matrixing]
+        Matrix -->|L / R| Deemph[De-emphasis]
     end
     
     Deemph -->|48 kS/s| AudioOut[PortAudio Output]
@@ -88,7 +88,7 @@ cmake --build build --config Release
 
 To start live streaming from the radio:
 ```powershell
-./build/Release/FM_Radio.exe --stream
+./build/Release/FM_Radio.exe
 ```
 
 To record raw IQ data samples for testing (press ctrl+C to stop):
@@ -98,6 +98,6 @@ To record raw IQ data samples for testing (press ctrl+C to stop):
 
 To write to an audio (.wav) file:
 ```powershell
-./build/Release/FM_Radio.exe
+./build/Release/FM_Radio.exe --save
 ```
 
