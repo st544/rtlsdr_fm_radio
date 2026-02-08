@@ -4,6 +4,9 @@ A real-time, multi-threaded Software Defined Radio (SDR) receiver written in C++
 
 This project implements a complete Digital Signal Processing (DSP) pipeline that interfaces with RTL-SDR hardware to demodulate FM Broadcast signals. It features a custom Stereo Decoder, real-time Spectral Analysis, and a lock-free double-buffered architecture for high-throughput processing.
 
+<p align="center">
+  <img src="assets/GUI_020726.PNG" width="800" title="GUI Screenshot">
+</p>
 
 ## Core Features
 
