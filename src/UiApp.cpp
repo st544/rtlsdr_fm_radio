@@ -127,8 +127,8 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
         ImGui::SliderFloat("Spec dB min", &spec_db_min, -100.0f, 0.0f);
         ImGui::SliderFloat("Spec dB max", &spec_db_max, -100.0f, 0.0f);
         ImGui::SliderFloat("Smooth alpha", &smooth_alpha, 0.0f, 0.98f);
-        //ImGui::SliderFloat("WF dB min", &wf_db_min, -180.0f, 0.0f);
-        //ImGui::SliderFloat("WF dB max", &wf_db_max, -180.0f, 0.0f);
+        ImGui::SliderFloat("WF dB min", &wf_db_min, -180.0f, 0.0f);
+        ImGui::SliderFloat("WF dB max", &wf_db_max, -180.0f, 0.0f);
         ImGui::End();
 
         // Snapshot the latest data (no heavy copies)

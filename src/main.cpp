@@ -17,6 +17,7 @@
 #include "RfFFTAnalyzer.hpp"
 #include "UiApp.hpp"
 
+#define NFFT 2048
 
 static std::atomic<uint64_t> g_underruns{0};
 static std::atomic<bool> g_stop_requested{false};
@@ -282,7 +283,7 @@ int main(int argc, char* argv[]) {
                 // Push to FFT ring buffer for visualizer
                 rf_block.push_back(x.real());
                 rf_block.push_back(x.imag());
-                if (rf_block.size() == 4096 * 2) {
+                if (rf_block.size() == NFFT * 2) {
                     size_t written = fft_ring.push(rf_block.data(), rf_block.size());
                     rf_block.clear();
                 }
@@ -349,26 +350,27 @@ int main(int argc, char* argv[]) {
 
 
     // Start RF Analyzer thread
-    const int Nfft = 2048;
     const int wf_height = 400;
-    RfFFTAnalyzer rf_fft(Nfft, (int)fs);
-    SpectrumBuffer rf_spec(Nfft);
-    WaterfallBuffer rf_waterfall(wf_height, Nfft);
+    RfFFTAnalyzer rf_fft(NFFT, (int)fs);
+    SpectrumBuffer rf_spec(NFFT);
+    WaterfallBuffer rf_waterfall(wf_height, NFFT);
 
     std::thread rf_analyzer([&] {
-        const int hop_complex = 512;                // Read 512 samples before updating screen
-        const int hop_floats = hop_complex * 2;     // 1024 real + imag
-        const int frame_floats = Nfft * 2;          // 4096 Nfft real + imag for Spectrum Buffer
+        const int hop_complex = NFFT / 4;           // Read before updating screen
+        const int hop_floats = hop_complex * 2;     // real + imag
+        const int frame_floats = NFFT * 2;          // Nfft real + imag for Spectrum Buffer
 
         // Decimate rate to 30Hz
-        const int wf_skip = (fs / hop_complex) / 30;    // 2.4MS/s / 512 samples / 30Hz = 156 skip rate
+        const int wf_skip = (fs / hop_complex) / 30;    // 2.4MS/s / hop samples / 30Hz 
         int wf_counter = 0;
+        std::vector<float> waterfall_accumulator(NFFT, 0.0f);   // buffer to smooth RF waterfall
 
         std::vector<float> fifo;                    // Sliding window for FFT current + history 
         fifo.reserve(frame_floats * 2);             // 2x size of FFT
 
         std::vector<float> tmp(hop_floats);         // Stores hop samples
         std::vector<float> frame(frame_floats);     // Frame that gets passed into RF FFT Analyzer
+
 
         while (running.load(std::memory_order_relaxed) || fft_ring.read_available() > 0) {
 
@@ -389,11 +391,27 @@ int main(int argc, char* argv[]) {
                 rf_fft.compute_db_shifted(frame.data(), w);
                 rf_spec.publish(now_seconds());
 
-                if (wf_counter >= wf_skip) {
-                    rf_waterfall.push_row(w);
-                    wf_counter = 0;
+
+                for (int i = 0; i < NFFT; ++i) {
+                    waterfall_accumulator[i] += w[i];
                 }
                 wf_counter++;
+
+                // Push to Waterfall only when full
+                if (wf_counter >= wf_skip) {
+                    // Divide by count to get the Average
+                    float scale = 1.0f / (float)wf_counter;
+                    for (int i = 0; i < NFFT; ++i) {
+                        waterfall_accumulator[i] *= scale;
+                    }
+
+                    // Push the averaged row
+                    rf_waterfall.push_row(waterfall_accumulator.data());
+
+                    // Reset
+                    std::fill(waterfall_accumulator.begin(), waterfall_accumulator.end(), 0.0f);
+                    wf_counter = 0;
+                }
 
                 // overlap: drop hop
                 fifo.erase(fifo.begin(), fifo.begin() + hop_floats);
@@ -405,7 +423,7 @@ int main(int argc, char* argv[]) {
 
     // Instantiate UIApp struct and call run method
     UiAppConfig cfg;
-    cfg.fft_size = Nfft;                // 2048 
+    cfg.fft_size = NFFT;                // 2048 
     cfg.rf_sample_rate = fs;           
     cfg.center_freq_hz = fc;            // 93.3MHz
 
