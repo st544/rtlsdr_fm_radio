@@ -83,6 +83,9 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
     std::vector<float> x_axis;
     BuildFreqAxis(x_axis, cfg.fft_size, cfg.rf_sample_rate);
 
+    static double link_x_min = x_axis.front();
+    static double link_x_max = x_axis.back();
+
     std::vector<float> wf_linear;
     float wf_db_min = -60.0f;
     float wf_db_max = -20.0f;
@@ -159,9 +162,11 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
         ImGui::Begin("RF View");
 
         if (ImPlot::BeginPlot("Spectrum", ImVec2(-1, 260))) {
-            // x axis in kHz is often nicer:
-            // (Option: build a kHz axis once; but keeping Hz is fine)
-            ImPlot::SetupAxes("Freq Offset (kHz)", "dB", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+            // x axis in kHz
+            ImPlot::SetupAxes("Freq Offset (kHz)", "dB"); //, ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+
+            // Link X-Axis
+            ImPlot::SetupAxisLinks(ImAxis_X1, &link_x_min, &link_x_max);
 
             // Manual y-limits so it doesn't jump around
             ImPlot::SetupAxisLimits(ImAxis_Y1, spec_db_min, spec_db_max, ImGuiCond_Always);
@@ -176,7 +181,7 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
 
         
         // ---- Waterfall Heatmap ----
-        // X-Axis: Frequency in MHz or kHz (matching your spectrum)
+        // X-Axis: Frequency in kHz 
         double x_min = x_axis.front();
         double x_max = x_axis.back();
         
@@ -188,7 +193,7 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
             
             // Setup Axes
             ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_NoLabel, ImPlotAxisFlags_NoLabel);
-            //ImPlot::SetupAxisLimits(ImAxis_X1, x_min, x_max, ImGuiCond_Always);
+            ImPlot::SetupAxisLinks(ImAxis_X1, &link_x_min, &link_x_max);    // Link X-Axis (Connects to the same variables as Spectrum)
             ImPlot::SetupAxisLimits(ImAxis_Y1, y_min, y_max, ImGuiCond_Always);
 
             // Color Map (Jet is standard for waterfalls)
