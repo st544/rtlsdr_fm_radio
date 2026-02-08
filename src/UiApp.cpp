@@ -83,9 +83,9 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
     std::vector<float> x_axis;
     BuildFreqAxis(x_axis, cfg.fft_size, cfg.rf_sample_rate);
 
-    //std::vector<float> wf_linear;
-    //float wf_db_min = -120.0f;
-    //float wf_db_max = -30.0f;
+    std::vector<float> wf_linear;
+    float wf_db_min = -60.0f;
+    float wf_db_max = -20.0f;
 
     float spec_db_min = -60.0f;
     float spec_db_max = -20.0;
@@ -131,9 +131,9 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
         // Snapshot the latest data (no heavy copies)
         const SpectrumFrame& spec = rf_spec.latest();
 
-        //if (!paused) {
-        //   rf_wf.linearize(wf_linear); // contiguous rows*cols
-        //}
+        if (!paused) {
+           rf_wf.linearize(wf_linear); // contiguous rows*cols
+        }
 
 
         const float* spec_plot = spec.db.data();
@@ -172,22 +172,47 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
             ImPlot::EndPlot();
         }
 
-        /*
+        ImGui::Spacing();
+
+        
         // ---- Waterfall Heatmap ----
-        const int rows = rf_wf.rows();
-        const int cols = rf_wf.bins();
+        // X-Axis: Frequency in MHz or kHz (matching your spectrum)
+        double x_min = x_axis.front();
+        double x_max = x_axis.back();
+        
+        // Y-Axis: Time/History (0 to Height)
+        double y_min = 0;
+        double y_max = rf_wf.max_rows();
 
-        if (ImPlot::BeginPlot("Waterfall", ImVec2(-1, 360))) {
-            ImPlot::SetupAxes(nullptr, nullptr,
-                              ImPlotAxisFlags_NoTickLabels,
-                              ImPlotAxisFlags_NoTickLabels);
+        if (ImPlot::BeginPlot("##Waterfall", ImVec2(-1, -1))) { // -1,-1 fills remaining space
+            
+            // Setup Axes
+            ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_NoLabel, ImPlotAxisFlags_NoLabel);
+            //ImPlot::SetupAxisLimits(ImAxis_X1, x_min, x_max, ImGuiCond_Always);
+            ImPlot::SetupAxisLimits(ImAxis_Y1, y_min, y_max, ImGuiCond_Always);
 
-            if (rows > 0 && cols == cfg.fft_size && (int)wf_linear.size() == rows * cols) {
-                ImPlot::PlotHeatmap("wf", wf_linear.data(), rows, cols, wf_db_min, wf_db_max);
+            // Color Map (Jet is standard for waterfalls)
+            ImPlot::PushColormap(ImPlotColormap_Jet);
+
+            // Draw Heatmap
+            // rows = current filled height, cols = fft bins
+            int rows = wf_linear.size() / cfg.fft_size;
+            int cols = cfg.fft_size;
+            
+            if (rows > 0) {
+                double bottom_y = y_max - rows;
+                // Point 1 (Bottom-Left): x_min, top_y
+                // Point 2 (Top-Right):   x_max, bottom_y
+                ImPlot::PlotHeatmap("##WF", wf_linear.data(), rows, cols, 
+                                    wf_db_min, wf_db_max, 
+                                    nullptr, 
+                                    {x_min, y_max}, {x_max, bottom_y});
             }
+
+            ImPlot::PopColormap();
             ImPlot::EndPlot();
         }
-        */
+        
 
         ImGui::End(); // RF View
 

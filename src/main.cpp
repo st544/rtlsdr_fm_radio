@@ -89,13 +89,25 @@ int main(int argc, char* argv[]) {
     std::signal(SIGINT, ctrlC_Invoked);
 
     // Parse arguments
-    bool live_stream = false;
+    bool live_stream = true;    // live stream by default
     bool record_mode = false;
     std::ofstream raw_dump;
 
     for(int i=1; i<argc; i++) {
+
+        if (std::strcmp(argv[i], "-h") == 0 || std::strcmp(argv[i], "--help") == 0) {
+            std::cout << "RTL-SDR FM Radio Receiver\n";
+            std::cout << "Usage: FM_Radio [options]\n\n";
+            std::cout << "Options:\n";
+            std::cout << "  (default)   Enable live audio output (PortAudio)\n";
+            std::cout << "  --save      Save 10s processed audio to 'stereo_out.wav' file\n";
+            std::cout << "  --record    Record raw IQ samples to 'raw_iq_samples.bin'\n";
+            std::cout << "  -h, --help  Show this usage information\n";
+            return 0;
+        }
+
         if (std::strcmp(argv[i], "--record") == 0) record_mode = true;
-        if (std::strcmp(argv[i], "--stream") == 0) live_stream = true;
+        if (std::strcmp(argv[i], "--save") == 0) live_stream = false;       // save to .wav file
     }
 
     // Record mode
@@ -201,7 +213,7 @@ int main(int argc, char* argv[]) {
 
     // Set up PortAudio stream for live mode
     if (live_stream) {
-        std::cout<<"Entering live streaming mode. Press Ctrl+C to stop"<<std::endl;
+        std::cout<<"Entering live streaming mode"<<std::endl;
         PaError r = Pa_Initialize();    // open/start stream
         if (r != paNoError) {
             std::cerr<<"PortAudio Init Error: " << Pa_GetErrorText(r) << std::endl;
@@ -344,32 +356,44 @@ int main(int argc, char* argv[]) {
     WaterfallBuffer rf_waterfall(wf_height, Nfft);
 
     std::thread rf_analyzer([&] {
-        const int hop_complex = 512;
-        const int hop_floats = hop_complex * 2;
-        const int frame_floats = Nfft * 2;
+        const int hop_complex = 512;                // Read 512 samples before updating screen
+        const int hop_floats = hop_complex * 2;     // 1024 real + imag
+        const int frame_floats = Nfft * 2;          // 4096 Nfft real + imag for Spectrum Buffer
 
-        std::vector<float> fifo;
-        fifo.reserve(frame_floats * 2);
+        // Decimate rate to 30Hz
+        const int wf_skip = (fs / hop_complex) / 30;    // 2.4MS/s / 512 samples / 30Hz = 156 skip rate
+        int wf_counter = 0;
 
-        std::vector<float> tmp(hop_floats);
-        std::vector<float> frame(frame_floats);
+        std::vector<float> fifo;                    // Sliding window for FFT current + history 
+        fifo.reserve(frame_floats * 2);             // 2x size of FFT
+
+        std::vector<float> tmp(hop_floats);         // Stores hop samples
+        std::vector<float> frame(frame_floats);     // Frame that gets passed into RF FFT Analyzer
 
         while (running.load(std::memory_order_relaxed) || fft_ring.read_available() > 0) {
+
+            // Read exactly one "hop" from FFT ring buffer
             if (fft_ring.pop(tmp.data(), hop_floats) != (size_t)hop_floats) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 continue;
             }
 
+            // Append "hop" into FFT FIFO
             fifo.insert(fifo.end(), tmp.begin(), tmp.end());
 
+            // Wait until FFT FIFO has 2048 complex samples
             while ((int)fifo.size() >= frame_floats) {
-                std::copy(fifo.begin(), fifo.begin() + frame_floats, frame.begin());
+                std::copy(fifo.begin(), fifo.begin() + frame_floats, frame.begin());    // Copy oldest 2048 samples in FIFO to Frame for FFT
 
                 float* w = rf_spec.write_ptr();
                 rf_fft.compute_db_shifted(frame.data(), w);
                 rf_spec.publish(now_seconds());
 
-                rf_waterfall.push_row(w);
+                if (wf_counter >= wf_skip) {
+                    rf_waterfall.push_row(w);
+                    wf_counter = 0;
+                }
+                wf_counter++;
 
                 // overlap: drop hop
                 fifo.erase(fifo.begin(), fifo.begin() + hop_floats);
@@ -387,12 +411,6 @@ int main(int argc, char* argv[]) {
 
     UiApp::Run(cfg, rf_spec, rf_waterfall);
 
-    while (running.load(std::memory_order_relaxed)) {
-        if (g_stop_requested.load(std::memory_order_relaxed)) {
-            break;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
-    }
 
     // stop async read
     rtlsdr_cancel_async(dev);

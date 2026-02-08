@@ -12,7 +12,7 @@ public:
           out((fftwf_complex*)fftwf_malloc(sizeof(fftwf_complex) * N))
     {
         for (int n = 0; n < N; ++n)
-            window[n] = 0.5f - 0.5f * std::cos(2.0f * 3.141592654f * n / (N - 1));
+            window[n] = 0.5f - 0.5f * std::cos(2.0f * 3.141592654f * n / (N - 1));  // Generate Hanning window
 
         plan = fftwf_plan_dft_1d(N, in, out, FFTW_FORWARD, FFTW_MEASURE);
     }
