@@ -106,16 +106,60 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
-        // ---- Controls ----
+        // ---- Play/Volume ----
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(250, 720), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(250, 60), ImGuiCond_FirstUseEver);
+        ImGui::Begin("##Transport", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
+
+        // Play button
+        bool is_playing = cfg.stream_active->load();
+
+        // Style: White Button, Black Text
+        ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(1.0f, 1.0f, 1.0f, 1.0f)); // White
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.8f, 0.8f, 1.0f)); // Light Grey
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.6f, 0.6f, 0.6f, 1.0f)); // Grey
+        ImGui::PushStyleColor(ImGuiCol_Text,          ImVec4(0.0f, 0.0f, 0.0f, 1.0f)); // Black Text
+
+        if (is_playing) {
+            if (ImGui::Button("STOP", ImVec2(80, 40))) {
+                cfg.stream_active->store(false);
+            }
+        } else {
+            if (ImGui::Button("PLAY", ImVec2(80, 40))) {
+                cfg.stream_active->store(true);
+            }
+        }
+        
+        ImGui::PopStyleColor(4);
+
+        // Volume Slider
+        ImGui::SameLine(); // Put next element on the same line
+        
+        // Read current volume atomic
+        float current_vol = cfg.volume_level->load();
+        
+        // Setup vertical slider or knob style
+        ImGui::PushItemWidth(120); // Width of slider
+        
+        // Vertical centering trick
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 10); 
+        if (ImGui::SliderFloat("Vol", &current_vol, 0.0f, 2.0f, "")) {
+             cfg.volume_level->store(current_vol);
+        }
+        ImGui::PopItemWidth();
+
+        ImGui::End();
+
+
+        // ---- Controls ----
+        ImGui::SetNextWindowPos(ImVec2(0, 60), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(250, 300), ImGuiCond_FirstUseEver);
 
         ImGui::Begin("Controls");
         ImGui::Text("Center: %.3f MHz", cfg.center_freq_hz / 1e6);
         ImGui::Text("RF rate: %d Hz", cfg.rf_sample_rate);
         ImGui::Text("FFT: %d", cfg.fft_size);
 
-        ImGui::Checkbox("Pause", &paused);
         ImGui::SliderFloat("Spec dB min", &spec_db_min, -100.0f, 0.0f);
         ImGui::SliderFloat("Spec dB max", &spec_db_max, -100.0f, 0.0f);
         ImGui::SliderFloat("Smooth alpha", &smooth_alpha, 0.0f, 0.98f);

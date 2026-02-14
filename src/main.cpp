@@ -23,6 +23,8 @@ static std::atomic<uint64_t> g_underruns{0};
 static std::atomic<bool> g_stop_requested{false};
 std::atomic<bool> running{true};
 std::atomic<bool> reader_finished{false};
+std::atomic<bool> stream_active = false;
+std::atomic<float> volume_level = 1.2f;
 
 // Context struct for rtlsdr async callback
 struct AsyncContext {
@@ -43,6 +45,12 @@ static void rtlsdr_async_cb(unsigned char* buf, uint32_t len, void* ctx_void) {
     }
 }
 
+// PA callback with audio buffer and play/stop bool
+struct AudioContext {
+    CircularBuffer<float>* ring;
+    std::atomic<bool>* is_playing;
+};
+
 // Audiostreaming callback
 static int paCallback(const void* input, void* output, 
                         unsigned long frameCount,
@@ -52,15 +60,22 @@ static int paCallback(const void* input, void* output,
 {
 
     float* out = (float*)output;
-    auto* ring = reinterpret_cast<CircularBuffer<float>*>(userData);
+    auto* ctx = reinterpret_cast<AudioContext*>(userData);
 
     size_t samples_needed = frameCount * 2;
 
-    size_t read = ring->pop(out, samples_needed);               // read 'frameCount' samples
+    size_t read = ctx->ring->pop(out, samples_needed);               // read 'frameCount' samples
+
     if (read < samples_needed) {
         std::fill(out + read, out + frameCount, 0.0f);      // If buffer empty, fill rest with silence
         g_underruns.fetch_add(1, std::memory_order_relaxed);
     }
+
+    // Fill entire buffer with zeros if stopped
+    if (!ctx->is_playing->load(std::memory_order_relaxed)) {
+        std::fill(out, out + samples_needed, 0.0f);
+    }
+
     return paContinue;
 }
 
@@ -194,6 +209,11 @@ int main(int argc, char* argv[]) {
     bool stream_started = false;
     const size_t prime_target = framesPerBuffer * 20;    // ~0.4s
 
+    // Audio context for play/stop
+    AudioContext audio_ctx;
+    audio_ctx.ring = &audio_ring;
+    audio_ctx.is_playing = &stream_active;
+
     // Audio file buffer
     const uint64_t target_audio = (uint64_t)fa * 10;    // 10 seconds
     std::vector<float> audio;
@@ -229,12 +249,21 @@ int main(int argc, char* argv[]) {
             fa,
             framesPerBuffer,
             paCallback,
-            &audio_ring        // userData
+            &audio_ctx        // userData
         );
         if (err != paNoError) {
             std::cerr<<"PortAudio Open Stream Error: " << Pa_GetErrorText(err) << std::endl; 
         }
     }
+
+
+    // Instantiate UIApp struct 
+    UiAppConfig cfg;
+    cfg.fft_size = NFFT;                // 2048 
+    cfg.rf_sample_rate = fs;           
+    cfg.center_freq_hz = fc;            // 93.3MHz
+    cfg.stream_active = &stream_active;
+    cfg.volume_level = &volume_level;
 
     ///////////////////////////////////
     // DSP Pipeline Main Loop
@@ -258,12 +287,19 @@ int main(int argc, char* argv[]) {
 
             // Force exit if Ctrl+C is used
             if (!running.load(std::memory_order_relaxed) && iq_ring.read_available() == 0) {
+                cfg.stream_active->store(false);
                 break;
             }
 
+            // Read from IQ ring buffer
             size_t n = iq_ring.pop(iqbuf.data(), iqbuf.size());
             if (n == 0) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                continue;
+            }
+
+            // Skip processing if stop button is pressed
+            if (!stream_active.load(std::memory_order_relaxed)) {
                 continue;
             }
 
@@ -312,7 +348,7 @@ int main(int argc, char* argv[]) {
                     left = agc.apply(left);             // Automatic gain control
                     right = agc.apply(right);
 
-                    float volume_knob = 1.2f;           // Volume control
+                    float volume_knob = volume_level.load(std::memory_order_relaxed);   // Volume control
                     left *= volume_knob;
                     right *= volume_knob;
 
@@ -420,14 +456,7 @@ int main(int argc, char* argv[]) {
 
     });
 
-
-    // Instantiate UIApp struct and call run method
-    UiAppConfig cfg;
-    cfg.fft_size = NFFT;                // 2048 
-    cfg.rf_sample_rate = fs;           
-    cfg.center_freq_hz = fc;            // 93.3MHz
-
-    // Blocks until window is closed
+    // Call run to display RF Visualizer Window - Blocks until window is closed
     UiApp::Run(cfg, rf_spec, rf_waterfall);
 
     // stop async read

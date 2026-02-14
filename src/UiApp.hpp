@@ -1,7 +1,10 @@
+#include <atomic>
 #include "SpectrumBuffer.hpp"
 #include "WaterfallBuffer.hpp"
 
 struct UiAppConfig {
+    std::atomic<bool>* stream_active;
+    std::atomic<float>* volume_level;
     int fft_size;
     int rf_sample_rate;
     double center_freq_hz;
