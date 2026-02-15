@@ -1,4 +1,5 @@
 #include <atomic>
+#include <functional>
 #include "SpectrumBuffer.hpp"
 #include "WaterfallBuffer.hpp"
 
@@ -8,6 +9,8 @@ struct UiAppConfig {
     int fft_size;
     int rf_sample_rate;
     double center_freq_hz;
+
+    std::function<void(float)> retune_callback;
 };
 
 class UiApp {

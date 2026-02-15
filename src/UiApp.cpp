@@ -13,11 +13,20 @@
 #include "backends/imgui_impl_opengl3.h"
 
 
-static void BuildFreqAxis(std::vector<float>& x_khz, int N, int fs_hz) {
-    x_khz.resize(N);
-    const float df = (float)fs_hz / (float)N / 1000.0f;
-    const float f0 = -(float)fs_hz / 2.0 / 1000.0f;
-    for (int i = 0; i < N; ++i) x_khz[i] = f0 + df * i;
+static void BuildFreqAxis(std::vector<float>& x_freq, int N, int fs_hz, double center_freq_hz) {
+    x_freq.resize(N);
+    float center_mhz = (float)center_freq_hz / 1e6;
+    float bandwidth_mhz = (float)fs_hz / 1e6;
+    float start_mhz = center_mhz - (bandwidth_mhz/2.0f);
+    float step_mhz = bandwidth_mhz / (float)N;
+    for (int i = 0; i < N; i++) {
+        x_freq[i] = start_mhz + (step_mhz * i);
+    }
+}
+
+static int InvisibleYAxisFormatter(double value, char* buff, int size, void* data) {
+    // Print 5-6 spaces. This is roughly the width of "-100.0"
+    return snprintf(buff, size, "      "); 
 }
 
 
@@ -69,10 +78,10 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
 
     // UI
     std::vector<float> x_axis;
-    BuildFreqAxis(x_axis, cfg.fft_size, cfg.rf_sample_rate);
+    BuildFreqAxis(x_axis, cfg.fft_size, cfg.rf_sample_rate, cfg.center_freq_hz);
 
-    static double link_x_min = x_axis.front();
-    static double link_x_max = x_axis.back();
+    static double link_x_min = cfg.center_freq_hz / 1.0e6 - 0.9; 
+    static double link_x_max = cfg.center_freq_hz / 1.0e6 + 0.9; 
 
     std::vector<float> wf_linear;
     float wf_db_min = -60.0f;
@@ -90,6 +99,8 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
     bool paused = false;
     bool quit = false;
 
+    static double last_freq = cfg.center_freq_hz;
+
 
     while (!quit) {
         // Events
@@ -100,6 +111,17 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
             if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_CLOSE) quit = true;
         }
 
+        // Detect of center frequency changed
+        if (cfg.center_freq_hz != last_freq) {
+            
+            double shift_mhz = (cfg.center_freq_hz - last_freq) / 1e6;
+
+            BuildFreqAxis(x_axis, cfg.fft_size, cfg.rf_sample_rate, cfg.center_freq_hz);
+            link_x_min += shift_mhz;
+            link_x_max += shift_mhz;
+
+            last_freq = cfg.center_freq_hz;
+        }
 
         // New frame
         ImGui_ImplOpenGL3_NewFrame();
@@ -153,16 +175,53 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
 
         // ---- Controls ----
         ImGui::SetNextWindowPos(ImVec2(0, 60), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(250, 300), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(250, 400), ImGuiCond_FirstUseEver);
 
         ImGui::Begin("Controls");
-        ImGui::Text("Center: %.3f MHz", cfg.center_freq_hz / 1e6);
-        ImGui::Text("RF rate: %d Hz", cfg.rf_sample_rate);
+
+        // Tuning feature
+        ImGui::Separator();
+        //ImGui::Text("Tuner");
+        float current_mhz = cfg.center_freq_hz / 1e6f;
+        float step = 0.1f; // 100 kHz step
+
+        ImGui::PushButtonRepeat(true);
+        // --- STEP DOWN BUTTON (<) ---
+        if (ImGui::ArrowButton("##Left", ImGuiDir_Left)) {
+            if (cfg.retune_callback) {
+                float new_freq = std::max(88.0f, current_mhz - step); // Subtract 0.1 MHz and clamp to 88.0
+                cfg.retune_callback(new_freq);
+            }
+        }
+        ImGui::SameLine();
+        ImGui::Text("  Center freq: %.1f MHz  ", current_mhz);
+        ImGui::SameLine();
+
+        // --- STEP UP BUTTON (>) ---
+        if (ImGui::ArrowButton("##Right", ImGuiDir_Right)) {
+            if (cfg.retune_callback) {
+                float new_freq = std::min(108.0f, current_mhz + step); // Add 0.1 MHz and clamp to 108.0
+                cfg.retune_callback(new_freq);
+            }
+        }
+
+        // Disable Repeat 
+        ImGui::PopButtonRepeat();
+        
+        // Tooltip for help
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Click to step 100kHz, Hold to scan");
+        }
+
+        ImGui::Separator();
+        ImGui::Spacing();
+        //ImGui::Text("Center: %.3f MHz", current_mhz) ;//cfg.center_freq_hz / 1e6);
+        ImGui::Text("Sample rate: %d Hz", cfg.rf_sample_rate);
         ImGui::Text("FFT: %d", cfg.fft_size);
 
-        ImGui::SliderFloat("Spec dB min", &spec_db_min, -100.0f, 0.0f);
-        ImGui::SliderFloat("Spec dB max", &spec_db_max, -100.0f, 0.0f);
-        ImGui::SliderFloat("Smooth alpha", &smooth_alpha, 0.0f, 0.98f);
+        ImGui::SliderFloat("RF dB min", &spec_db_min, -100.0f, 0.0f);
+        ImGui::SliderFloat("RF dB max", &spec_db_max, -100.0f, 0.0f);
+        ImGui::SliderFloat("Alpha", &smooth_alpha, 0.0f, 0.98f);
         ImGui::SliderFloat("WF dB min", &wf_db_min, -180.0f, 0.0f);
         ImGui::SliderFloat("WF dB max", &wf_db_max, -180.0f, 0.0f);
 
@@ -176,7 +235,7 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
             wf_db_max = -20.0f;
         }
 
-        ImGui::Text("Center: %.3f MHz", cfg.center_freq_hz / 1e6);
+        //ImGui::Text("Center: %.3f MHz", cfg.center_freq_hz / 1e6);
 
         ImGui::End();
 
@@ -191,8 +250,8 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
 
         const float* spec_plot = spec.db.data();
 
+        // Apply Exponential Moving Average to smooth RF Spectrum plot (single-pole IIR low pass)
         if (enable_smoothing && (int)spec.db.size() == cfg.fft_size) {
-            // initialize once (optional)
             static bool init = false;
             if (!init) {
                 std::copy(spec.db.begin(), spec.db.end(), spec_smooth.begin());
@@ -201,7 +260,7 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
                 const float a = smooth_alpha;
                 const float b = 1.0f - a;
                 for (int i = 0; i < cfg.fft_size; ++i) {
-                    spec_smooth[i] = a * spec_smooth[i] + b * spec.db[i];
+                    spec_smooth[i] = a * spec_smooth[i] + b * spec.db[i];   // EMA = (val * a) + (prev_val * (1-a))
                 }
             }
             spec_plot = spec_smooth.data();
@@ -215,14 +274,27 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
         ImGui::Begin("RF View");
 
         if (ImPlot::BeginPlot("Spectrum", ImVec2(-1, 260))) {
-            // x axis in kHz
-            ImPlot::SetupAxes("Freq Offset (kHz)", "dB"); //, ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
-
-            // Link X-Axis
-            ImPlot::SetupAxisLinks(ImAxis_X1, &link_x_min, &link_x_max);
+            // x axis in MHz
+            ImPlot::SetupAxisFormat(ImAxis_X1, "%.1f");
+            ImPlot::SetupAxes("Freq (MHz)", "dB"); 
 
             // Manual y-limits so it doesn't jump around
             ImPlot::SetupAxisLimits(ImAxis_Y1, spec_db_min, spec_db_max, ImGuiCond_Always);
+
+            // Link X-Axis
+            ImPlot::SetupAxisLinks(ImAxis_X1, &link_x_min, &link_x_max);
+ 
+             // 100kHz spacing only if bandwidth is < 2MHz
+            double current_width = link_x_max - link_x_min;
+            if (current_width < 2.0) {
+                double start_tick = ceil(link_x_min * 10.0) / 10.0;
+                double end_tick = floor(link_x_max * 10.0) / 10.0;
+                int tick_count = (int)(round((end_tick - start_tick) / 0.1)) + 1;
+
+                if (tick_count > 1) {
+                    ImPlot::SetupAxisTicks(ImAxis_X1, start_tick, end_tick, tick_count);
+                }
+            }
 
             if ((int)spec.db.size() == cfg.fft_size && (int)x_axis.size() == cfg.fft_size) {
                 ImPlot::PlotLine("RF", x_axis.data(), spec_plot, cfg.fft_size);
@@ -233,7 +305,7 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
         ImGui::Spacing();
         
         // ---- Waterfall Heatmap ----
-        // X-Axis: Frequency in kHz 
+        // X-Axis: Frequency in MHz 
         double x_min = x_axis.front();
         double x_max = x_axis.back();
         
@@ -242,10 +314,25 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
         double y_max = rf_wf.max_rows();
 
         if (ImPlot::BeginPlot("##Waterfall", ImVec2(-1, -1))) { // -1,-1 fills remaining space
-            
+
             // Setup Axes
-            ImPlot::SetupAxes(nullptr, nullptr, ImPlotAxisFlags_NoLabel, ImPlotAxisFlags_NoLabel);
+            ImPlot::SetupAxes(nullptr, "dB");
+            ImPlot::SetupAxis(ImAxis_Y1, nullptr);
+            ImPlot::SetupAxis(ImAxis_Y1, nullptr);
+            ImPlot::SetupAxisFormat(ImAxis_Y1, InvisibleYAxisFormatter);
             ImPlot::SetupAxisLinks(ImAxis_X1, &link_x_min, &link_x_max);    // Link X-Axis (Connects to the same variables as Spectrum)
+
+            // 100kHz increments
+            double current_width = link_x_max - link_x_min;
+            if (current_width < 2.0) {
+                double start_tick = ceil(link_x_min * 10.0) / 10.0;
+                double end_tick = floor(link_x_max * 10.0) / 10.0;
+                int tick_count = (int)(round((end_tick - start_tick) / 0.1)) + 1;
+
+                if (tick_count > 1) {
+                    ImPlot::SetupAxisTicks(ImAxis_X1, start_tick, end_tick, tick_count);
+                }
+            }
             ImPlot::SetupAxisLimits(ImAxis_Y1, y_min, y_max, ImGuiCond_Always);
 
             // Color Map (Jet is standard for waterfalls)

@@ -265,6 +265,19 @@ int main(int argc, char* argv[]) {
     cfg.stream_active = &stream_active;
     cfg.volume_level = &volume_level;
 
+    // Tuning logic
+    cfg.retune_callback = [&](float new_freq_mhz) {
+        
+        uint32_t new_freq_hz = (uint32_t)(new_freq_mhz * 1e6);
+        
+        // Call the hardware function 
+        rtlsdr_set_center_freq(dev, new_freq_hz);
+        
+        // Update the config variable 
+        cfg.center_freq_hz = new_freq_hz;
+        
+    };
+
     ///////////////////////////////////
     // DSP Pipeline Main Loop
     ///////////////////////////////////
