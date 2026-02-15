@@ -24,7 +24,8 @@ static std::atomic<bool> g_stop_requested{false};
 std::atomic<bool> running{true};
 std::atomic<bool> reader_finished{false};
 std::atomic<bool> stream_active = false;
-std::atomic<float> volume_level = 1.2f;
+std::atomic<float> volume_level = 0.5f;
+std::atomic<int> rf_gain = 150;
 
 // Context struct for rtlsdr async callback
 struct AsyncContext {
@@ -170,10 +171,11 @@ int main(int argc, char* argv[]) {
     r = rtlsdr_set_center_freq(dev, fc);
     if (r) { std::cerr << "set_center_freq failed: " << r << "\n"; return 1; }
 
-    r = rtlsdr_set_tuner_gain_mode(dev, 0);
+    r = rtlsdr_set_tuner_gain_mode(dev, 1); // 1 = manual
     if (r) { std::cerr << "set_tuner_gain_mode failed: " << r << "\n"; return 1; }
 
-    r = rtlsdr_set_agc_mode(dev, 0);
+    //r = rtlsdr_set_agc_mode(dev, 0);
+    rtlsdr_set_tuner_gain(dev, rf_gain);
 
     // Reset buffers
     rtlsdr_reset_buffer(dev);
@@ -264,18 +266,25 @@ int main(int argc, char* argv[]) {
     cfg.center_freq_hz = fc;            // 93.3MHz
     cfg.stream_active = &stream_active;
     cfg.volume_level = &volume_level;
+    cfg.rf_gain = &rf_gain;
 
     // Tuning logic
     cfg.retune_callback = [&](float new_freq_mhz) {
-        
+
+        // Set new center frequency
         uint32_t new_freq_hz = (uint32_t)(new_freq_mhz * 1e6);
+        rtlsdr_set_center_freq(dev, new_freq_hz);  
+        cfg.center_freq_hz = new_freq_hz; 
+
+        // Set RF gain whenever at new center freq
+        rtlsdr_set_tuner_gain(dev, rf_gain.load()); 
         
-        // Call the hardware function 
-        rtlsdr_set_center_freq(dev, new_freq_hz);
-        
-        // Update the config variable 
-        cfg.center_freq_hz = new_freq_hz;
-        
+    };
+
+    // Setting RF gain manually
+    cfg.set_gain_callback = [&](int gain_tenths_db) {
+        rtlsdr_set_tuner_gain(dev, gain_tenths_db);
+        rf_gain.store(gain_tenths_db);
     };
 
     ///////////////////////////////////

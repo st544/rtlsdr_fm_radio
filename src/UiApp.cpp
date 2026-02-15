@@ -84,10 +84,10 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
     static double link_x_max = cfg.center_freq_hz / 1.0e6 + 0.9; 
 
     std::vector<float> wf_linear;
-    float wf_db_min = -60.0f;
-    float wf_db_max = -20.0f;
+    float wf_db_min = -70.0f;
+    float wf_db_max = -30.0f;
 
-    float spec_db_min = -60.0f;
+    float spec_db_min = -85.0f;
     float spec_db_max = -20.0;
 
     static std::vector<float> spec_smooth;
@@ -215,15 +215,31 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
 
         ImGui::Separator();
         ImGui::Spacing();
-        //ImGui::Text("Center: %.3f MHz", current_mhz) ;//cfg.center_freq_hz / 1e6);
+
         ImGui::Text("Sample rate: %d Hz", cfg.rf_sample_rate);
         ImGui::Text("FFT: %d", cfg.fft_size);
 
+        // Gain control
+        int current_gain = cfg.rf_gain->load();
+        float gain_db = current_gain / 10.0f; // Convert 300 -> 30.0
+
+        // Slider from 0.0dB to 50.0dB
+        if (ImGui::SliderFloat("RF Gain", &gain_db, 0.0f, 50.0f, "%.1f dB")) {
+            int new_gain = (int)(gain_db * 10.0f);
+            
+            // Call the lambda to update hardware
+            if (cfg.set_gain_callback) {
+                cfg.set_gain_callback(new_gain);
+            } else {
+                cfg.rf_gain->store(new_gain);
+            }
+        }
+
         ImGui::SliderFloat("RF dB min", &spec_db_min, -100.0f, 0.0f);
         ImGui::SliderFloat("RF dB max", &spec_db_max, -100.0f, 0.0f);
-        ImGui::SliderFloat("Alpha", &smooth_alpha, 0.0f, 0.98f);
         ImGui::SliderFloat("WF dB min", &wf_db_min, -180.0f, 0.0f);
         ImGui::SliderFloat("WF dB max", &wf_db_max, -180.0f, 0.0f);
+        ImGui::SliderFloat("Smooth", &smooth_alpha, 0.0f, 0.98f);
 
         ImGui::Spacing();
 
@@ -235,7 +251,6 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
             wf_db_max = -20.0f;
         }
 
-        //ImGui::Text("Center: %.3f MHz", cfg.center_freq_hz / 1e6);
 
         ImGui::End();
 
@@ -253,17 +268,20 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
         // Apply Exponential Moving Average to smooth RF Spectrum plot (single-pole IIR low pass)
         if (enable_smoothing && (int)spec.db.size() == cfg.fft_size) {
             static bool init = false;
-            if (!init) {
-                std::copy(spec.db.begin(), spec.db.end(), spec_smooth.begin());
-                init = true;
-            } else {
-                const float a = smooth_alpha;
-                const float b = 1.0f - a;
-                for (int i = 0; i < cfg.fft_size; ++i) {
-                    spec_smooth[i] = a * spec_smooth[i] + b * spec.db[i];   // EMA = (val * a) + (prev_val * (1-a))
+            if (is_playing) {
+                if (!init) {
+                    std::copy(spec.db.begin(), spec.db.end(), spec_smooth.begin());
+                    init = true;
+                } else {
+                    const float a = smooth_alpha;
+                    const float b = 1.0f - a;
+                    for (int i = 0; i < cfg.fft_size; ++i) {
+                        spec_smooth[i] = a * spec_smooth[i] + b * spec.db[i];   // EMA = (val * a) + (prev_val * (1-a))
+                    }
                 }
             }
             spec_plot = spec_smooth.data();
+
         }
 
 

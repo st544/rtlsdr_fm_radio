@@ -6,11 +6,13 @@
 struct UiAppConfig {
     std::atomic<bool>* stream_active;
     std::atomic<float>* volume_level;
+    std::atomic<int>* rf_gain;
     int fft_size;
     int rf_sample_rate;
     double center_freq_hz;
 
     std::function<void(float)> retune_callback;
+    std::function<void(int)> set_gain_callback;
 };
 
 class UiApp {
