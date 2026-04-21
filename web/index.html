@@ -1,0 +1,925 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RTL-SDR FM Radio</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101114;
+      --panel: #181b20;
+      --panel-2: #20252b;
+      --text: #f2f4f7;
+      --muted: #aab3bd;
+      --line: #343b44;
+      --accent: #34d399;
+      --accent-2: #38bdf8;
+      --warn: #f59e0b;
+      --bad: #fb7185;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, sans-serif;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 300px 1fr;
+    }
+
+    aside {
+      border-right: 1px solid var(--line);
+      background: var(--panel);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    main {
+      padding: 22px;
+      display: grid;
+      grid-template-rows: auto auto repeat(3, minmax(260px, 1fr));
+      gap: 18px;
+      min-width: 0;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .subtle {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .status {
+      display: grid;
+      gap: 10px;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      font-size: 14px;
+      min-width: 0;
+    }
+
+    .status-row span:first-child {
+      color: var(--muted);
+    }
+
+    .status-row strong {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      text-align: right;
+    }
+
+    .pill {
+      min-width: 86px;
+      text-align: center;
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: var(--panel-2);
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .pill.live {
+      color: #052e1b;
+      background: var(--accent);
+    }
+
+    .pill.warn {
+      color: #3d2500;
+      background: var(--warn);
+    }
+
+    .pill.bad {
+      color: #3f0712;
+      background: var(--bad);
+    }
+
+    .controls {
+      display: grid;
+      gap: 14px;
+    }
+
+    button {
+      width: 100%;
+      min-height: 46px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--text);
+      color: #111418;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: var(--panel-2);
+      color: var(--text);
+    }
+
+    label {
+      display: grid;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 20px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 18px;
+      min-width: 0;
+    }
+
+    .frequency {
+      font-size: 48px;
+      line-height: 1;
+      font-weight: 750;
+      letter-spacing: 0;
+    }
+
+    .plot {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 10px;
+    }
+
+    .rds-panel {
+      display: grid;
+      grid-template-columns: minmax(96px, 0.45fr) minmax(120px, 0.7fr) minmax(220px, 2fr);
+      gap: 14px;
+      padding: 14px 0 4px;
+      border-bottom: 1px solid var(--line);
+      min-width: 0;
+    }
+
+    .rds-field {
+      min-width: 0;
+      display: grid;
+      gap: 6px;
+    }
+
+    .rds-label {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .rds-value {
+      min-height: 24px;
+      font-size: 18px;
+      font-weight: 650;
+      overflow-wrap: anywhere;
+    }
+
+    .plot-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      min-height: 260px;
+      background: #0b0c0f;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      display: block;
+    }
+
+    @media (max-width: 860px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      main {
+        grid-template-rows: auto auto 320px 320px 340px;
+      }
+
+      .header {
+        align-items: start;
+        flex-direction: column;
+      }
+
+      .rds-panel {
+        grid-template-columns: 1fr;
+      }
+
+      .frequency {
+        font-size: 40px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <div>
+        <h1>RTL-SDR FM Radio</h1>
+        <p class="subtle">Web app for RTL-SDR FM Radio project</p>
+      </div>
+
+      <div class="status">
+        <div class="status-row">
+          <span>Server</span>
+          <strong id="serverUrl">localhost:9001</strong>
+        </div>
+        <div class="status-row">
+          <span>Spectrum</span>
+          <span id="spectrumState" class="pill">Idle</span>
+        </div>
+        <div class="status-row">
+          <span>Audio</span>
+          <span id="audioState" class="pill">Stopped</span>
+        </div>
+        <div class="status-row">
+          <span>Frames</span>
+          <strong id="frameCount">0</strong>
+        </div>
+        <div class="status-row">
+          <span>Range</span>
+          <strong id="freqRange">92.10-94.50 MHz</strong>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button id="reconnectButton" class="secondary">Reconnect Spectrum</button>
+        <button id="listenButton">Start Audio</button>
+        <button id="disconnectAudioButton" class="secondary">Stop Audio</button>
+        <label>
+          Browser volume
+          <input id="volumeSlider" type="range" min="0" max="1.5" step="0.01" value="1">
+        </label>
+        <label>
+          dB min
+          <input id="dbMinSlider" type="range" min="-120" max="-20" step="1" value="-90">
+        </label>
+        <label>
+          dB max
+          <input id="dbMaxSlider" type="range" min="-100" max="10" step="1" value="-20">
+        </label>
+        <label>
+          Spectrum smoothing
+          <input id="smoothSlider" type="range" min="0.05" max="1" step="0.01" value="0.35">
+        </label>
+      </div>
+
+    </aside>
+
+    <main>
+      <section class="header">
+        <div>
+          <div id="centerFrequency" class="frequency">93.3 MHz</div>
+          <div class="subtle">FM Radio Spectrum Visualizer</div>
+        </div>
+        <div id="streamState" class="pill warn">Waiting</div>
+      </section>
+
+      <section class="rds-panel" aria-label="RDS decoded data">
+        <div class="rds-field">
+          <div class="rds-label">RDS</div>
+          <div id="rdsState" class="pill">Idle</div>
+        </div>
+        <div class="rds-field">
+          <div class="rds-label">PI / PS</div>
+          <div class="rds-value"><span id="rdsPi">--</span> / <span id="rdsPs">--</span></div>
+        </div>
+        <div class="rds-field">
+          <div class="rds-label">RadioText</div>
+          <div id="rdsRt" class="rds-value">--</div>
+        </div>
+      </section>
+
+      <section class="plot">
+        <div class="plot-title">
+          <strong>RF spectrum</strong>
+          <span id="spectrumInfo">dB vs MHz</span>
+        </div>
+        <canvas id="spectrumCanvas"></canvas>
+      </section>
+
+      <section class="plot">
+        <div class="plot-title">
+          <strong>RF Waterfall</strong>
+        </div>
+        <canvas id="waterfallCanvas"></canvas>
+      </section>
+
+      <section class="plot">
+        <div class="plot-title">
+          <strong>Frequency Spectrum</strong>
+          <span id="audioSpectrumInfo">Strength vs Hz</span>
+        </div>
+        <canvas id="audioSpectrumCanvas"></canvas>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const AUDIO_SAMPLE_RATE = 48000;
+    const CHANNELS = 2;
+    const SPECTRUM_MAGIC = 0x31534652;
+
+    const serverUrl = document.querySelector("#serverUrl");
+    const spectrumState = document.querySelector("#spectrumState");
+    const audioState = document.querySelector("#audioState");
+    const rdsState = document.querySelector("#rdsState");
+    const streamState = document.querySelector("#streamState");
+    const frameCount = document.querySelector("#frameCount");
+    const centerFrequency = document.querySelector("#centerFrequency");
+    const freqRange = document.querySelector("#freqRange");
+    const rdsPi = document.querySelector("#rdsPi");
+    const rdsPs = document.querySelector("#rdsPs");
+    const rdsRt = document.querySelector("#rdsRt");
+    const spectrumInfo = document.querySelector("#spectrumInfo");
+    const reconnectButton = document.querySelector("#reconnectButton");
+    const listenButton = document.querySelector("#listenButton");
+    const disconnectAudioButton = document.querySelector("#disconnectAudioButton");
+    const volumeSlider = document.querySelector("#volumeSlider");
+    const dbMinSlider = document.querySelector("#dbMinSlider");
+    const dbMaxSlider = document.querySelector("#dbMaxSlider");
+    const smoothSlider = document.querySelector("#smoothSlider");
+    const spectrumCanvas = document.querySelector("#spectrumCanvas");
+    const audioSpectrumCanvas = document.querySelector("#audioSpectrumCanvas");
+    const waterfallCanvas = document.querySelector("#waterfallCanvas");
+    const spectrumCtx = spectrumCanvas.getContext("2d");
+    const audioSpectrumCtx = audioSpectrumCanvas.getContext("2d");
+    const waterfallCtx = waterfallCanvas.getContext("2d");
+    const audioSpectrumInfo = document.querySelector("#audioSpectrumInfo");
+
+    let spectrumSocket = null;
+    let audioSocket = null;
+    let rdsSocket = null;
+    let audioContext = null;
+    let audioAnalyser = null;
+    let audioFrequencyData = null;
+    let player = null;
+    let gain = null;
+    let latestDb = new Float32Array(0);
+    let smoothedDb = new Float32Array(0);
+    let centerHz = 93_300_000;
+    let sampleRateHz = 2_400_000;
+    let frames = 0;
+    let waterfallRows = [];
+
+    const AUDIO_EQ_CENTERS = [
+      32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500,
+      630, 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000,
+      6300, 8000, 10000, 12500, 16000
+    ];
+    const AUDIO_EQ_MIN_HZ = 32;
+    const AUDIO_EQ_MAX_HZ = 16000;
+    const AUDIO_EQ_MIN_DB = -100;
+    const AUDIO_EQ_MAX_DB = -20;
+
+    serverUrl.textContent = location.host;
+
+    function setPill(element, text, mode) {
+      element.textContent = text;
+      element.className = "pill";
+      if (mode) {
+        element.classList.add(mode);
+      }
+    }
+
+    function wsUrl(path) {
+      const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+      return `${protocol}//${location.host}${path}`;
+    }
+
+    function resizeCanvas(canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const scale = window.devicePixelRatio || 1;
+      const width = Math.max(320, Math.floor(rect.width * scale));
+      const height = Math.max(220, Math.floor(rect.height * scale));
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+    }
+
+    function mhz(valueHz) {
+      return valueHz / 1e6;
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function jet(value) {
+      const t = clamp(value, 0, 1);
+      const r = clamp(1.5 - Math.abs(4 * t - 3), 0, 1);
+      const g = clamp(1.5 - Math.abs(4 * t - 2), 0, 1);
+      const b = clamp(1.5 - Math.abs(4 * t - 1), 0, 1);
+      return [r * 255, g * 255, b * 255];
+    }
+
+    function updateSmoothedSpectrum(rawDb) {
+      const a = Number(smoothSlider.value);
+      if (smoothedDb.length !== rawDb.length) {
+        smoothedDb = new Float32Array(rawDb);
+        return;
+      }
+
+      for (let i = 0; i < rawDb.length; i++) {
+        smoothedDb[i] = rawDb[i] * a + smoothedDb[i] * (1 - a);
+      }
+    }
+
+    function axisFontSize() {
+      return Math.round(12 * (window.devicePixelRatio || 1));
+    }
+
+    function fillClampedText(ctx, text, x, y, minX, maxX) {
+      const width = ctx.measureText(text).width;
+      const safeX = clamp(x, minX + width / 2, maxX - width / 2);
+      ctx.fillText(text, safeX, y);
+    }
+
+    function logFrequencyFraction(hz) {
+      const minLog = Math.log10(AUDIO_EQ_MIN_HZ);
+      const maxLog = Math.log10(AUDIO_EQ_MAX_HZ);
+      return (Math.log10(hz) - minLog) / (maxLog - minLog);
+    }
+
+    function formatAudioHz(hz) {
+      if (hz >= 1000) {
+        const khz = hz / 1000;
+        return `${Number.isInteger(khz) ? khz : khz.toFixed(1)}k`;
+      }
+
+      return `${hz}`;
+    }
+
+    function audioBandEdges(index) {
+      const center = AUDIO_EQ_CENTERS[index];
+      const lower = index === 0
+        ? AUDIO_EQ_MIN_HZ
+        : Math.sqrt(AUDIO_EQ_CENTERS[index - 1] * center);
+      const upper = index === AUDIO_EQ_CENTERS.length - 1
+        ? AUDIO_EQ_MAX_HZ
+        : Math.sqrt(center * AUDIO_EQ_CENTERS[index + 1]);
+
+      return { lower, upper };
+    }
+
+    function frequencyTicks() {
+      if (sampleRateHz <= 0 || centerHz <= 0) {
+        return [];
+      }
+
+      return [-0.5, -0.25, 0, 0.25, 0.5].map((fraction) => ({
+        fraction,
+        hz: centerHz + sampleRateHz * fraction
+      }));
+    }
+
+    function drawFrequencyAxis(ctx, margin, width, height, plotW, plotH, drawGrid) {
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillStyle = "#aab3bd";
+      ctx.strokeStyle = "#343b44";
+      ctx.lineWidth = 1;
+
+      for (const tick of frequencyTicks()) {
+        const x = margin.left + (tick.fraction + 0.5) * plotW;
+
+        if (drawGrid) {
+          ctx.beginPath();
+          ctx.moveTo(x, margin.top);
+          ctx.lineTo(x, margin.top + plotH);
+          ctx.stroke();
+        }
+
+        if (tick.fraction === 0) {
+          ctx.strokeStyle = "#34d399";
+          ctx.beginPath();
+          ctx.moveTo(x, margin.top);
+          ctx.lineTo(x, margin.top + plotH);
+          ctx.stroke();
+          ctx.strokeStyle = "#343b44";
+        }
+
+        fillClampedText(ctx, mhz(tick.hz).toFixed(2), x, height - margin.bottom + 14, margin.left, width - margin.right);
+      }
+
+      ctx.textAlign = "right";
+      ctx.fillText("MHz", width - margin.right, height - margin.bottom + 32);
+    }
+
+    function drawSpectrum() {
+      resizeCanvas(spectrumCanvas);
+      const width = spectrumCanvas.width;
+      const height = spectrumCanvas.height;
+      const dbMin = Number(dbMinSlider.value);
+      const dbMax = Number(dbMaxSlider.value);
+      const margin = { left: 78, right: 34, top: 24, bottom: 62 };
+      const plotW = width - margin.left - margin.right;
+      const plotH = height - margin.top - margin.bottom;
+
+      spectrumCtx.fillStyle = "#0b0c0f";
+      spectrumCtx.fillRect(0, 0, width, height);
+
+      spectrumCtx.strokeStyle = "#343b44";
+      spectrumCtx.lineWidth = 1;
+      spectrumCtx.font = `${axisFontSize()}px Segoe UI`;
+      spectrumCtx.fillStyle = "#aab3bd";
+
+      drawFrequencyAxis(spectrumCtx, margin, width, height, plotW, plotH, true);
+
+      for (let i = 0; i <= 5; i++) {
+        const y = margin.top + (i / 5) * plotH;
+        const db = dbMax - (i / 5) * (dbMax - dbMin);
+        spectrumCtx.beginPath();
+        spectrumCtx.moveTo(margin.left, y);
+        spectrumCtx.lineTo(margin.left + plotW, y);
+        spectrumCtx.stroke();
+        spectrumCtx.textAlign = "right";
+        spectrumCtx.textBaseline = "middle";
+        spectrumCtx.fillText(db.toFixed(0), margin.left - 14, y);
+      }
+
+      spectrumCtx.textAlign = "left";
+      spectrumCtx.textBaseline = "top";
+      spectrumCtx.fillText("dB", 16, margin.top);
+
+      if (smoothedDb.length === 0) {
+        spectrumCtx.fillStyle = "#aab3bd";
+        spectrumCtx.fillText("Waiting for RF spectrum frames", margin.left + 18, margin.top + 32);
+        return;
+      }
+
+      spectrumCtx.strokeStyle = "#38bdf8";
+      spectrumCtx.lineWidth = 2 * (window.devicePixelRatio || 1);
+      spectrumCtx.beginPath();
+
+      for (let i = 0; i < smoothedDb.length; i++) {
+        const x = margin.left + (i / Math.max(1, smoothedDb.length - 1)) * plotW;
+        const normalized = (smoothedDb[i] - dbMin) / (dbMax - dbMin);
+        const y = margin.top + (1 - clamp(normalized, 0, 1)) * plotH;
+        if (i === 0) {
+          spectrumCtx.moveTo(x, y);
+        } else {
+          spectrumCtx.lineTo(x, y);
+        }
+      }
+
+      spectrumCtx.stroke();
+    }
+
+    function drawAudioSpectrumAxis(ctx, margin, width, height, plotW, plotH) {
+      const ticks = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillStyle = "#aab3bd";
+      ctx.strokeStyle = "#343b44";
+      ctx.lineWidth = 1;
+
+      for (const hz of ticks) {
+        const x = margin.left + logFrequencyFraction(hz) * plotW;
+
+        ctx.beginPath();
+        ctx.moveTo(x, margin.top);
+        ctx.lineTo(x, margin.top + plotH);
+        ctx.stroke();
+
+        fillClampedText(ctx, formatAudioHz(hz), x, height - margin.bottom + 14, margin.left, width - margin.right);
+      }
+
+      ctx.textAlign = "right";
+      ctx.fillText("Hz", width - margin.right, height - margin.bottom + 32);
+    }
+
+    function drawAudioSpectrum() {
+      resizeCanvas(audioSpectrumCanvas);
+      const width = audioSpectrumCanvas.width;
+      const height = audioSpectrumCanvas.height;
+      const margin = { left: 78, right: 34, top: 24, bottom: 62 };
+      const plotW = width - margin.left - margin.right;
+      const plotH = height - margin.top - margin.bottom;
+
+      audioSpectrumCtx.fillStyle = "#0b0c0f";
+      audioSpectrumCtx.fillRect(0, 0, width, height);
+
+      audioSpectrumCtx.strokeStyle = "#343b44";
+      audioSpectrumCtx.lineWidth = 1;
+      audioSpectrumCtx.font = `${axisFontSize()}px Segoe UI`;
+      audioSpectrumCtx.fillStyle = "#aab3bd";
+
+      drawAudioSpectrumAxis(audioSpectrumCtx, margin, width, height, plotW, plotH);
+
+      for (let i = 0; i <= 5; i++) {
+        const y = margin.top + (i / 5) * plotH;
+        const db = AUDIO_EQ_MAX_DB - (i / 5) * (AUDIO_EQ_MAX_DB - AUDIO_EQ_MIN_DB);
+        audioSpectrumCtx.beginPath();
+        audioSpectrumCtx.moveTo(margin.left, y);
+        audioSpectrumCtx.lineTo(margin.left + plotW, y);
+        audioSpectrumCtx.stroke();
+        audioSpectrumCtx.textAlign = "right";
+        audioSpectrumCtx.textBaseline = "middle";
+        audioSpectrumCtx.fillText(db.toFixed(0), margin.left - 14, y);
+      }
+
+      audioSpectrumCtx.textAlign = "left";
+      audioSpectrumCtx.textBaseline = "top";
+      audioSpectrumCtx.fillText("dB", 16, margin.top);
+
+      if (!audioAnalyser || !audioFrequencyData) {
+        audioSpectrumCtx.fillStyle = "#aab3bd";
+        audioSpectrumCtx.fillText("Start audio to show 32 Hz-16 kHz strength", margin.left + 18, margin.top + 32);
+        return;
+      }
+
+      audioAnalyser.getFloatFrequencyData(audioFrequencyData);
+
+      const gradient = audioSpectrumCtx.createLinearGradient(0, margin.top + plotH, 0, margin.top);
+      gradient.addColorStop(0, "#34d399");
+      gradient.addColorStop(0.58, "#38bdf8");
+      gradient.addColorStop(1, "#f59e0b");
+      audioSpectrumCtx.fillStyle = gradient;
+
+      for (let i = 0; i < AUDIO_EQ_CENTERS.length; i++) {
+        const center = AUDIO_EQ_CENTERS[i];
+        const edges = audioBandEdges(i);
+        const binWidth = audioContext.sampleRate / audioAnalyser.fftSize;
+        const startBin = Math.max(1, Math.floor(edges.lower / binWidth));
+        const endBin = Math.min(audioFrequencyData.length - 1, Math.ceil(edges.upper / binWidth));
+        let powerSum = 0;
+        let count = 0;
+
+        for (let bin = startBin; bin <= endBin; bin++) {
+          const value = audioFrequencyData[bin];
+          if (Number.isFinite(value)) {
+            powerSum += Math.pow(10, value / 10);
+            count++;
+          }
+        }
+
+        const db = count > 0 ? 10 * Math.log10(powerSum / count) : AUDIO_EQ_MIN_DB;
+        const normalized = clamp((db - AUDIO_EQ_MIN_DB) / (AUDIO_EQ_MAX_DB - AUDIO_EQ_MIN_DB), 0, 1);
+        const x = margin.left + logFrequencyFraction(center) * plotW;
+        const nextCenter = AUDIO_EQ_CENTERS[Math.min(i + 1, AUDIO_EQ_CENTERS.length - 1)];
+        const previousCenter = AUDIO_EQ_CENTERS[Math.max(i - 1, 0)];
+        const leftFraction = i === 0 ? 0 : logFrequencyFraction(Math.sqrt(previousCenter * center));
+        const rightFraction = i === AUDIO_EQ_CENTERS.length - 1 ? 1 : logFrequencyFraction(Math.sqrt(center * nextCenter));
+        const slotW = Math.max(4, (rightFraction - leftFraction) * plotW);
+        const barW = Math.max(3, slotW * 0.72);
+        const barH = normalized * plotH;
+        const barX = x - barW / 2;
+        const barY = margin.top + plotH - barH;
+
+        audioSpectrumCtx.fillRect(barX, barY, barW, barH);
+      }
+
+      audioSpectrumCtx.strokeStyle = "#343b44";
+      audioSpectrumCtx.strokeRect(margin.left, margin.top, plotW, plotH);
+    }
+
+    function drawWaterfall() {
+      resizeCanvas(waterfallCanvas);
+      const width = waterfallCanvas.width;
+      const height = waterfallCanvas.height;
+      const dbMin = Number(dbMinSlider.value);
+      const dbMax = Number(dbMaxSlider.value);
+      const margin = { left: 78, right: 34, top: 24, bottom: 62 };
+      const plotW = width - margin.left - margin.right;
+      const plotH = height - margin.top - margin.bottom;
+
+      waterfallCtx.fillStyle = "#0b0c0f";
+      waterfallCtx.fillRect(0, 0, width, height);
+
+      const image = waterfallCtx.createImageData(plotW, plotH);
+      const rowCount = waterfallRows.length;
+
+      for (let y = 0; y < plotH; y++) {
+        const historyIndex = Math.floor((y / Math.max(1, plotH - 1)) * Math.max(0, rowCount - 1));
+        const row = waterfallRows[historyIndex];
+        for (let x = 0; x < plotW; x++) {
+          const offset = (y * plotW + x) * 4;
+          if (!row) {
+            image.data[offset] = 11;
+            image.data[offset + 1] = 12;
+            image.data[offset + 2] = 15;
+            image.data[offset + 3] = 255;
+            continue;
+          }
+
+          const bin = Math.floor((x / Math.max(1, plotW - 1)) * (row.length - 1));
+          const normalized = (row[bin] - dbMin) / (dbMax - dbMin);
+          const [r, g, b] = jet(normalized);
+          image.data[offset] = r;
+          image.data[offset + 1] = g;
+          image.data[offset + 2] = b;
+          image.data[offset + 3] = 255;
+        }
+      }
+
+      waterfallCtx.putImageData(image, margin.left, margin.top);
+
+      waterfallCtx.strokeStyle = "#343b44";
+      waterfallCtx.lineWidth = 1;
+      waterfallCtx.strokeRect(margin.left, margin.top, plotW, plotH);
+
+      waterfallCtx.font = `${axisFontSize()}px Segoe UI`;
+      drawFrequencyAxis(waterfallCtx, margin, width, height, plotW, plotH, false);
+      waterfallCtx.textAlign = "left";
+      waterfallCtx.textBaseline = "middle";
+      waterfallCtx.fillStyle = "#aab3bd";
+      waterfallCtx.fillText("Time", 16, margin.top + plotH / 2);
+    }
+
+    function connectSpectrum() {
+      if (spectrumSocket) {
+        spectrumSocket.close();
+      }
+
+      spectrumSocket = new WebSocket(wsUrl("/spectrum"));
+      spectrumSocket.binaryType = "arraybuffer";
+      setPill(spectrumState, "Connecting", "warn");
+
+      spectrumSocket.onopen = () => {
+        setPill(spectrumState, "Connected", "live");
+        setPill(streamState, "Live", "live");
+      };
+
+      spectrumSocket.onmessage = (event) => {
+        const view = new DataView(event.data);
+        if (event.data.byteLength < 24 || view.getUint32(0, true) !== SPECTRUM_MAGIC) {
+          return;
+        }
+
+        const bins = view.getUint32(4, true);
+        centerHz = view.getFloat64(8, true);
+        sampleRateHz = view.getUint32(16, true);
+        latestDb = new Float32Array(event.data, 24, bins);
+        updateSmoothedSpectrum(latestDb);
+
+        frames++;
+        frameCount.textContent = frames.toLocaleString();
+        centerFrequency.textContent = `${mhz(centerHz).toFixed(1)} MHz`;
+        freqRange.textContent = `${mhz(centerHz - sampleRateHz / 2).toFixed(2)}-${mhz(centerHz + sampleRateHz / 2).toFixed(2)} MHz`;
+        spectrumInfo.textContent = `${bins} bins, ${sampleRateHz.toLocaleString()} Hz span, 30 FPS target`;
+
+        waterfallRows.push(new Float32Array(latestDb));
+        const maxRows = 260;
+        if (waterfallRows.length > maxRows) {
+          waterfallRows.splice(0, waterfallRows.length - maxRows);
+        }
+      };
+
+      spectrumSocket.onerror = () => {
+        setPill(spectrumState, "Error", "bad");
+      };
+
+      spectrumSocket.onclose = () => {
+        setPill(spectrumState, "Closed", "bad");
+        setPill(streamState, "Waiting", "warn");
+      };
+    }
+
+    function connectRds() {
+      if (rdsSocket) {
+        rdsSocket.close();
+      }
+
+      rdsSocket = new WebSocket(wsUrl("/rds"));
+      setPill(rdsState, "Connecting", "warn");
+
+      rdsSocket.onopen = () => {
+        setPill(rdsState, "Connected", "live");
+      };
+
+      rdsSocket.onmessage = (event) => {
+        let rds;
+        try {
+          rds = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+
+        setPill(rdsState, rds.synced ? "Locked" : "Searching", rds.synced ? "live" : "warn");
+        rdsPi.textContent = rds.pi || "--";
+        rdsPs.textContent = rds.programService || "--";
+        rdsRt.textContent = rds.radioText || "--";
+      };
+
+      rdsSocket.onerror = () => {
+        setPill(rdsState, "Error", "bad");
+      };
+
+      rdsSocket.onclose = () => {
+        setPill(rdsState, "Closed", "bad");
+      };
+    }
+
+    async function startAudio() {
+      if (!audioContext) {
+        audioContext = new AudioContext({ sampleRate: AUDIO_SAMPLE_RATE });
+        await audioContext.audioWorklet.addModule("/audio-worklet.js");
+        player = new AudioWorkletNode(audioContext, "pcm-player", {
+          numberOfOutputs: 1,
+          outputChannelCount: [CHANNELS]
+        });
+        gain = audioContext.createGain();
+        gain.gain.value = Number(volumeSlider.value);
+        audioAnalyser = audioContext.createAnalyser();
+        audioAnalyser.fftSize = 4096;
+        audioAnalyser.minDecibels = AUDIO_EQ_MIN_DB;
+        audioAnalyser.maxDecibels = AUDIO_EQ_MAX_DB;
+        audioAnalyser.smoothingTimeConstant = 0.82;
+        audioFrequencyData = new Float32Array(audioAnalyser.frequencyBinCount);
+        audioSpectrumInfo.textContent = `${audioAnalyser.frequencyBinCount.toLocaleString()} FFT bins, 32 Hz-16 kHz`;
+        player.connect(audioAnalyser).connect(gain).connect(audioContext.destination);
+      }
+
+      await audioContext.resume();
+
+      if (!audioSocket || audioSocket.readyState > WebSocket.OPEN) {
+        audioSocket = new WebSocket(wsUrl("/audio"));
+        audioSocket.binaryType = "arraybuffer";
+        audioSocket.onopen = () => setPill(audioState, "Running", "live");
+        audioSocket.onmessage = (event) => {
+          if (player) {
+            player.port.postMessage({ type: "pcm", buffer: event.data }, [event.data]);
+          }
+        };
+        audioSocket.onclose = () => setPill(audioState, "Stopped", "warn");
+        audioSocket.onerror = () => setPill(audioState, "Error", "bad");
+      }
+    }
+
+    function render() {
+      drawSpectrum();
+      drawAudioSpectrum();
+      drawWaterfall();
+      requestAnimationFrame(render);
+    }
+
+    reconnectButton.addEventListener("click", connectSpectrum);
+    listenButton.addEventListener("click", startAudio);
+    disconnectAudioButton.addEventListener("click", () => {
+      if (audioSocket) {
+        audioSocket.close();
+      }
+      if (audioContext) {
+        audioContext.suspend();
+      }
+      setPill(audioState, "Stopped", "warn");
+    });
+    volumeSlider.addEventListener("input", () => {
+      if (gain) {
+        gain.gain.value = Number(volumeSlider.value);
+      }
+    });
+
+    window.addEventListener("resize", () => {
+      resizeCanvas(spectrumCanvas);
+      resizeCanvas(audioSpectrumCanvas);
+      resizeCanvas(waterfallCanvas);
+    });
+
+    connectSpectrum();
+    connectRds();
+    render();
+  </script>
+</body>
+</html>

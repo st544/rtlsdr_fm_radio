@@ -21,6 +21,9 @@ This project implements a complete Digital Signal Processing (DSP) pipeline that
 * **Testing & CI:**
     * **Automated Verification:** GitHub Actions pipeline runs build and integration tests on every commit.
     * **Hardware Simulation:** Validates signal integrity (SNR) and filter logic using pre-recorded raw RF samples. 
+* **Network Streaming:**
+    * **WebSockets:** Serves a browser-based dashboard and streams audio, RF spectrum data, and RDS metadata over WebSockets. Can be exposed remotely with Cloudflare Tunnel.
+
 
 ## DSP Pipeline Architecture
 

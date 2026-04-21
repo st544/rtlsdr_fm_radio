@@ -219,6 +219,17 @@ void UiApp::Run(const UiAppConfig& cfg, const SpectrumBuffer& rf_spec, const Wat
         ImGui::Text("Sample rate: %d Hz", cfg.rf_sample_rate);
         ImGui::Text("FFT: %d", cfg.fft_size);
 
+        if (cfg.rds_decoder) {
+            RdsSnapshot rds = cfg.rds_decoder->snapshot();
+
+            ImGui::Separator();
+            ImGui::Text("RDS");
+            ImGui::Text("Lock: %s", rds.synced ? "Yes" : "No");
+            ImGui::Text("PI: %s", rds.pi.empty() ? "--" : rds.pi.c_str());
+            ImGui::Text("PS: %s", rds.program_service.empty() ? "--" : rds.program_service.c_str());
+            ImGui::TextWrapped("RT: %s", rds.radio_text.empty() ? "--" : rds.radio_text.c_str());
+        }
+
         // Gain control
         int current_gain = cfg.rf_gain->load();
         float gain_db = current_gain / 10.0f; // Convert 300 -> 30.0

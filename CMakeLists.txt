@@ -1,8 +1,15 @@
 cmake_minimum_required(VERSION 3.21)
 project(rtlsdr_fm_radio LANGUAGES CXX)
 
-add_executable(FM_Radio src/main.cpp src/UiApp.cpp)
+add_executable(FM_Radio
+    src/main.cpp
+    src/UiApp.cpp
+    src/WebServer.cpp
+)
 set_target_properties(FM_Radio PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED YES)
+target_compile_definitions(FM_Radio PRIVATE
+    RTLSDR_WEB_ROOT="${CMAKE_SOURCE_DIR}/web"
+)
 
 find_package(rtlsdr CONFIG REQUIRED)
 find_package(portaudio CONFIG REQUIRED)
@@ -10,6 +17,8 @@ find_package(FFTW3f CONFIG REQUIRED)
 find_package(SDL2 CONFIG REQUIRED)
 find_package(glad CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
+find_package(unofficial-uwebsockets CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 
 # ---- vendored imgui ----
 add_library(imgui STATIC
@@ -50,3 +59,7 @@ set_target_properties(DSPPipelineTest PROPERTIES CXX_STANDARD 20)
 
 target_link_libraries(DSPPipelineTest PRIVATE FFTW3::fftw3f)
 
+target_link_libraries(FM_Radio PRIVATE
+    unofficial::uwebsockets::uwebsockets
+    nlohmann_json::nlohmann_json
+)

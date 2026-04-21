@@ -6,6 +6,7 @@
 #include <chrono>
 #include <atomic>
 #include <csignal>
+#include <nlohmann/json.hpp>
 #include <rtl-sdr.h>
 #include <portaudio.h>
 #include "AudioFile.h"
@@ -15,7 +16,9 @@
 #include "SpectrumBuffer.hpp"
 #include "WaterfallBuffer.hpp"
 #include "RfFFTAnalyzer.hpp"
+#include "RdsDecoder.hpp"
 #include "UiApp.hpp"
+#include "WebServer.hpp"
 
 #define NFFT 2048
 
@@ -187,6 +190,7 @@ int main(int argc, char* argv[]) {
     // Instantiate dsp blocks
     FIRFilter<std::complex<float>> LPF(5, radio_taps);          // First stage LPF decimator
     StereoSeparator stereo(fq);                                 // Separates mono and stereo diff signals
+    RdsDecoder rds_decoder(static_cast<float>(fq));             // Decodes 57kHz RDS from MPX
     FIRFilter<float> LPF_mono(10, audio_taps);                  // Second stage anti-aliasing LPF decimator - mono
     FIRFilter<float> LPF_diff(10, audio_taps);                  // Second stage anti-aliasing LPF decimator - stereo diff
     NotchFilter19k pilot_notch(fa);                             // 19kHz notch filter
@@ -205,6 +209,7 @@ int main(int argc, char* argv[]) {
     // Audio ring buffer
     CircularBuffer<float> audio_ring(65536);      
     std::vector<float> stereo_out_block(1024);          // interleaved (L,R) output block
+    std::vector<float> ws_out_block(1024);
     int idx = 0;
     PaStream* stream = nullptr;
     unsigned long framesPerBuffer = 1024;
@@ -226,6 +231,10 @@ int main(int argc, char* argv[]) {
     CircularBuffer<float> fft_ring(1<<20);      // Buffer for RF visualizer
     std::vector<float> rf_block;
     rf_block.reserve(4096 * 2);
+
+    // WebSockets
+    WebSocketStreamer ws_streamer(9001);
+    ws_streamer.start();
 
 
     // LUT for byte to float conversion
@@ -267,6 +276,7 @@ int main(int argc, char* argv[]) {
     cfg.stream_active = &stream_active;
     cfg.volume_level = &volume_level;
     cfg.rf_gain = &rf_gain;
+    cfg.rds_decoder = &rds_decoder;
 
     // Tuning logic
     cfg.retune_callback = [&](float new_freq_mhz) {
@@ -304,6 +314,7 @@ int main(int argc, char* argv[]) {
         std::vector<uint8_t> iqbuf(16384);
         std::vector<float> outBlock(512);
         size_t outCount = 0;
+        double last_rds_publish = 0.0;
 
         while (!reader_finished.load(std::memory_order_acquire) || iq_ring.read_available() > 0) {
 
@@ -350,9 +361,26 @@ int main(int argc, char* argv[]) {
 
                 float fm = demod.push(x1);              // demodulate
                 fm = std::clamp(fm, -limit, limit);     // remove bad phase jumps
+                float fm_rds = fm;                      // Preserve MPX before audio DC blocking for RDS
                 fm = dc.push(fm);                       // audio DC blocker 
 
                 auto [raw_mono, raw_diff] = stereo.process(fm);     // stereo separator - 480kS/s
+                rds_decoder.process(fm_rds, stereo.phase);          // RDS decoder - 57kHz subcarrier
+
+                double t_now = now_seconds();
+                if (t_now - last_rds_publish >= 0.5) {
+                    RdsSnapshot rds = rds_decoder.snapshot();
+                    nlohmann::json payload{
+                        {"synced", rds.synced},
+                        {"pi", rds.pi},
+                        {"programService", rds.program_service},
+                        {"radioText", rds.radio_text},
+                        {"groups", rds.groups},
+                        {"blocks", rds.blocks}
+                    };
+                    ws_streamer.publishRds(payload.dump());
+                    last_rds_publish = t_now;
+                }
 
                 float mono_out, diff_out;
                 bool mono_ready = LPF_mono.Filter(raw_mono, mono_out);  // Second stage LPF - mono - 48kS/s
@@ -370,6 +398,9 @@ int main(int argc, char* argv[]) {
                     left = agc.apply(left);             // Automatic gain control
                     right = agc.apply(right);
 
+                    float left_c = left;
+                    float right_c = right;
+
                     float volume_knob = volume_level.load(std::memory_order_relaxed);   // Volume control
                     left *= volume_knob;
                     right *= volume_knob;
@@ -384,10 +415,13 @@ int main(int argc, char* argv[]) {
                             stream_started = true;
                         }
 
+                        ws_out_block[idx] = left_c;
                         stereo_out_block[idx++] = left;     // Push to interleaved stereo buffer
+                        ws_out_block[idx] = right_c;
                         stereo_out_block[idx++] = right;
                         if (idx == stereo_out_block.size()) {
                             audio_ring.push(stereo_out_block.data(), idx);
+                            ws_streamer.publishAudioPcm16(ws_out_block.data(), idx);        // websockets
                             idx = 0;
                         }
                     }
@@ -428,6 +462,7 @@ int main(int argc, char* argv[]) {
 
         std::vector<float> tmp(hop_floats);         // Stores hop samples
         std::vector<float> frame(frame_floats);     // Frame that gets passed into RF FFT Analyzer
+        double last_web_spectrum_publish = 0.0;
 
 
         while (running.load(std::memory_order_relaxed) || fft_ring.read_available() > 0) {
@@ -447,7 +482,13 @@ int main(int argc, char* argv[]) {
 
                 float* w = rf_spec.write_ptr();
                 rf_fft.compute_db_shifted(frame.data(), w);
-                rf_spec.publish(now_seconds());
+                double spectrum_time = now_seconds();
+                rf_spec.publish(spectrum_time);
+
+                if (spectrum_time - last_web_spectrum_publish >= (1.0 / 30.0)) {
+                    ws_streamer.publishSpectrum(w, NFFT, cfg.center_freq_hz, fs);
+                    last_web_spectrum_publish = spectrum_time;
+                }
 
 
                 for (int i = 0; i < NFFT; ++i) {
@@ -491,6 +532,8 @@ int main(int argc, char* argv[]) {
 
 
     rtlsdr_close(dev);      // Close device
+
+    ws_streamer.stop();
 
 
     if (live_stream) {

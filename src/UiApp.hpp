@@ -1,5 +1,6 @@
 #include <atomic>
 #include <functional>
+#include "RdsDecoder.hpp"
 #include "SpectrumBuffer.hpp"
 #include "WaterfallBuffer.hpp"
 
@@ -10,6 +11,7 @@ struct UiAppConfig {
     int fft_size;
     int rf_sample_rate;
     double center_freq_hz;
+    const RdsDecoder* rds_decoder = nullptr;
 
     std::function<void(float)> retune_callback;
     std::function<void(int)> set_gain_callback;
